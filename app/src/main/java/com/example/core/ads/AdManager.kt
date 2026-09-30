@@ -60,6 +60,7 @@ class AdManager(private val context: Context) {
                 val requestConfiguration = RequestConfiguration.Builder()
                     .setMaxAdContentRating(AdConstants.MAX_CONTENT_RATING)
                     .setTagForChildDirectedTreatment(AdConstants.TAG_FOR_CHILD_DIRECTED)
+                    .setTagForUnderAgeOfConsent(AdConstants.TAG_FOR_UNDER_AGE_CONSENT)
                     .setTestDeviceIds(listOf(AdRequest.DEVICE_ID_EMULATOR))
                     .build()
                 MobileAds.setRequestConfiguration(requestConfiguration)

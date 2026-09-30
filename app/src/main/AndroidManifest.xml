@@ -2,16 +2,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Các quyền tối thiểu cần thiết theo chuẩn Google Play 2026 -->
+    <!-- Tuyệt đối KHÔNG yêu cầu READ_EXTERNAL_STORAGE hay WRITE_EXTERNAL_STORAGE -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="com.android.vending.BILLING" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Tuân thủ chính sách Gia đình & Trẻ em 3+ (COPPA / Google Play Families Policy): Không thu thập AD_ID -->
+    <!-- Tuân thủ chính sách Gia đình & Trẻ em (COPPA / Google Play Families Policy): Không thu thập AD_ID -->
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />
 
-    <!-- Prevent AdServices Measurement Service bind errors on devices/emulators without Privacy Sandbox service -->
+    <!-- Ngăn ngừa các lỗi bind dịch vụ AdServices trên các thiết bị không có Privacy Sandbox -->
     <uses-permission android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION" tools:node="remove" />
     <uses-permission android:name="android.permission.ACCESS_ADSERVICES_AD_ID" tools:node="remove" />
     <uses-permission android:name="android.permission.ACCESS_ADSERVICES_TOPICS" tools:node="remove" />
@@ -48,20 +50,21 @@
         <property
             android:name="android.adservices.AD_SERVICES_CONFIG"
             tools:node="remove" />
+
+        <!-- Activity chính khởi chạy ứng dụng: com.looooorsasass.gamets.MainActivity -->
         <activity
-            android:name=".MainActivity"
+            android:name="com.looooorsasass.gamets.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.MyApplication">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
         <receiver
-            android:name=".core.notifications.FlashSaleAlarmReceiver"
+            android:name="com.example.core.notifications.FlashSaleAlarmReceiver"
             android:exported="false" />
     </application>
 

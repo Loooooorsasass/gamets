@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MazeX</string>
+    <string name="google_app_id" translatable="false">1:663262364969:android:32dfc8072e886310b72338</string>
+    <string name="gcm_defaultSenderId" translatable="false">663262364969</string>
+    <string name="default_web_client_id" translatable="false">663262364969-ag0rtiu5p50hs5ckokdiu1vvmmunbbq3.apps.googleusercontent.com</string>
+    <string name="google_api_key" translatable="false">AIzaSyAPYIbcaMV7zPKrsZQqZyCocDQSSgVDNBE</string>
+    <string name="project_id" translatable="false">starlit-landing-8smzh</string>
 </resources>

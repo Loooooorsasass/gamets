@@ -10,7 +10,7 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.example.MainActivity
+import com.looooorsasass.gamets.MainActivity
 import com.example.core.time.NetworkTimeManager
 import java.text.SimpleDateFormat
 import java.util.Date
