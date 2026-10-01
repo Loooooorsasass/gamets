@@ -76,6 +76,7 @@ class BillingManager(
                     isConnected = true
                     Log.d(TAG, "BillingClient kết nối thành công với Google Play Store")
                     queryAvailableProducts()
+                    queryPurchases()
                 } else {
                     isConnected = false
                     Log.w(TAG, "Billing setup thất bại: ${billingResult.debugMessage}")
@@ -87,6 +88,32 @@ class BillingManager(
                 Log.d(TAG, "Billing service bị ngắt kết nối")
             }
         })
+    }
+
+    /**
+     * Khôi phục / truy vấn các gói đã mua trước đó của người chơi (Restore Purchases)
+     */
+    fun queryPurchases() {
+        val client = billingClient ?: return
+        if (!isConnected) return
+        try {
+            val params = com.android.billingclient.api.QueryPurchasesParams.newBuilder()
+                .setProductType(BillingClient.ProductType.INAPP)
+                .build()
+
+            client.queryPurchasesAsync(params) { billingResult, purchasesList ->
+                if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                    Log.d(TAG, "Tìm thấy ${purchasesList.size} giao dịch đã mua")
+                    for (purchase in purchasesList) {
+                        if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
+                            handlePurchase(purchase)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Lỗi truy vấn giao dịch: ${e.message}")
+        }
     }
 
     /**

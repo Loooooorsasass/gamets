@@ -36,6 +36,7 @@ import com.example.data.shop.ShopCatalog
 import com.example.ui.components.GridControlMode
 import com.example.core.i18n.AppLanguage
 import com.example.core.i18n.Strings
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,6 +47,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 
 enum class AppScreen {
@@ -404,66 +406,82 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val activeGear = if (hasGearDurability) equippedGear else ""
         val adjustedDef = def.copy(vision = adjustVisionForGear(def.vision, activeGear, def.isWolfChase))
         val seed = customSeed ?: MazeBuilder.randomSeed().toLong()
-        val levelData = MazeGenerator.generateFromDef(adjustedDef, seed)
-        val maze = levelData.toMaze()
-        val distCache = MazeSolver.computeDistances(maze)
-        val goalDistCache = MazeSolver.computeDistancesToGoal(maze)
-        val goalHint = MazeSolver.computeGoalDirectionHint(maze, maze.start, goalDistCache)
-        val collectibles = MazeSolver.generateCollectibles(maze, adjustedDef)
-        val timeLimitSec = computeLevelTimeLimitSec(adjustedDef, activeGear)
-        val freeAegis = if (adjustedDef.isWolfChase && activeGear == "shield_aegis") 1 else 0
-
-        // Lưu cấu trúc logic của level vào Room database
-        viewModelScope.launch {
-            repository.saveMazeLevel(MazeGenerator.toEntity(levelData))
-        }
-
         val preservedControlMode = _uiState.value.activeGame.controlMode
 
-        _uiState.update {
-            it.copy(
-                currentScreen = AppScreen.PLAYING,
-                activeGame = ActiveGameState(
-                    maze = maze,
-                    levelDef = adjustedDef,
-                    player = maze.start,
-                    moves = 0,
-                    elapsedSec = 0,
-                    timeLimitSec = timeLimitSec,
-                    visitedCells = setOf(maze.start.y * maze.w + maze.start.x),
-                    pathHistory = listOf(maze.start),
-                    distCache = distCache,
-                    goalDistCache = goalDistCache,
-                    goalDirectionHint = goalHint,
-                    collectibles = collectibles,
-                    wolfPos = if (adjustedDef.isWolfChase) maze.start else null,
-                    wolfCubPos = null,
-                    wolfCubActive = false,
-                    wolfCubDistanceTraveled = 0,
-                    wolfCountdownSec = if (adjustedDef.isWolfChase) getWolfHeadStartSeconds(adjustedDef) else 0,
-                    wolfActive = false,
-                    wolfFrenzy = false,
-                    wolfSpeedMs = MazeConfig.WOLF_NORMAL_STEP_MS,
-                    wolfDistanceCells = 0,
-                    wolfStunnedUntilMs = 0L,
-                    playerFrozenUntilMs = 0L,
-                    wolfNextIceThrowAtMs = 0L,
-                    wolfIceBeamUntilMs = 0L,
-                    freeAegisShieldInRun = freeAegis,
-                    gearDurabilityConsumedInRun = false,
-                    wallHits = 0,
-                    gameOver = false,
-                    hasWon = false,
-                    earnedStars = 0,
-                    secPerCell = 0.0,
-                    isPaused = false,
-                    showExitDialog = false,
-                    showHint = false,
-                    controlMode = preservedControlMode
+        viewModelScope.launch {
+            // Chạy thuật toán sinh mê cung và tính toán solver trên Background Thread (Dispatchers.Default)
+            // Ngăn chặn hoàn toàn rủi ro ANR / Freeze UI đối với mê cung kích thước lớn (300x300 đến 1000x1000)
+            val generatedData = withContext(Dispatchers.Default) {
+                val levelData = MazeGenerator.generateFromDef(adjustedDef, seed)
+                val maze = levelData.toMaze()
+                val distCache = MazeSolver.computeDistances(maze)
+                val goalDistCache = MazeSolver.computeDistancesToGoal(maze)
+                val goalHint = MazeSolver.computeGoalDirectionHint(maze, maze.start, goalDistCache)
+                val collectibles = MazeSolver.generateCollectibles(maze, adjustedDef)
+                val timeLimitSec = computeLevelTimeLimitSec(adjustedDef, activeGear)
+                val freeAegis = if (adjustedDef.isWolfChase && activeGear == "shield_aegis") 1 else 0
+                
+                // Chỉ lưu SQLite đối với mê cung thông thường (<= 50x50) để tối ưu hiệu năng
+                if (adjustedDef.w <= 50 && adjustedDef.h <= 50) {
+                    repository.saveMazeLevel(MazeGenerator.toEntity(levelData))
+                }
+
+                object {
+                    val maze = maze
+                    val distCache = distCache
+                    val goalDistCache = goalDistCache
+                    val goalHint = goalHint
+                    val collectibles = collectibles
+                    val timeLimitSec = timeLimitSec
+                    val freeAegis = freeAegis
+                }
+            }
+
+            _uiState.update {
+                it.copy(
+                    currentScreen = AppScreen.PLAYING,
+                    activeGame = ActiveGameState(
+                        maze = generatedData.maze,
+                        levelDef = adjustedDef,
+                        player = generatedData.maze.start,
+                        moves = 0,
+                        elapsedSec = 0,
+                        timeLimitSec = generatedData.timeLimitSec,
+                        visitedCells = setOf(generatedData.maze.start.y * generatedData.maze.w + generatedData.maze.start.x),
+                        pathHistory = listOf(generatedData.maze.start),
+                        distCache = generatedData.distCache,
+                        goalDistCache = generatedData.goalDistCache,
+                        goalDirectionHint = generatedData.goalHint,
+                        collectibles = generatedData.collectibles,
+                        wolfPos = if (adjustedDef.isWolfChase) generatedData.maze.start else null,
+                        wolfCubPos = null,
+                        wolfCubActive = false,
+                        wolfCubDistanceTraveled = 0,
+                        wolfCountdownSec = if (adjustedDef.isWolfChase) getWolfHeadStartSeconds(adjustedDef) else 0,
+                        wolfActive = false,
+                        wolfFrenzy = false,
+                        wolfSpeedMs = MazeConfig.WOLF_NORMAL_STEP_MS,
+                        wolfDistanceCells = 0,
+                        wolfStunnedUntilMs = 0L,
+                        playerFrozenUntilMs = 0L,
+                        wolfNextIceThrowAtMs = 0L,
+                        wolfIceBeamUntilMs = 0L,
+                        freeAegisShieldInRun = generatedData.freeAegis,
+                        gearDurabilityConsumedInRun = false,
+                        wallHits = 0,
+                        gameOver = false,
+                        hasWon = false,
+                        earnedStars = 0,
+                        secPerCell = 0.0,
+                        isPaused = false,
+                        showExitDialog = false,
+                        showHint = false,
+                        controlMode = preservedControlMode
+                    )
                 )
-            )
+            }
+            startTimer()
         }
-        startTimer()
     }
 
     /**

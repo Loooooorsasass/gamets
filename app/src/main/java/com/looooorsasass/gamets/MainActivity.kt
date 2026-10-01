@@ -1,11 +1,17 @@
 package com.looooorsasass.gamets
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -64,8 +70,21 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: GameViewModel by viewModels()
 
+    private val requestNotificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Xin quyền thông báo (POST_NOTIFICATIONS) trên Android 13+ (API 33+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
+        // Xử lý deep link điều hướng từ thông báo Flash Sale
+        handleIntent(intent)
 
         // Áp dụng cấu hình thân thiện với trẻ em & gia đình (COPPA / Age 3+ / Xếp hạng G)
         try {
@@ -213,6 +232,18 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        val target = intent?.getStringExtra("NAVIGATE_TO")
+        if (target == "shop") {
+            viewModel.navigateTo(AppScreen.SHOP)
         }
     }
 }
