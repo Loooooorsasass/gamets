@@ -44,6 +44,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 
 enum class AppScreen {
@@ -134,6 +136,18 @@ data class GameUiState(
 class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getInstance(application)
     private val repository = GameRepository(db)
+
+    private val progressMutex = Mutex()
+
+    suspend fun mutateProgress(block: (GameProgressEntity) -> GameProgressEntity): GameProgressEntity {
+        return progressMutex.withLock {
+            val current = _uiState.value.progress
+            val updated = block(current)
+            repository.saveProgress(updated)
+            _uiState.update { it.copy(progress = updated) }
+            updated
+        }
+    }
 
     val soundManager = SoundManager(application)
     val hapticManager = HapticManager(application)
@@ -316,7 +330,24 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startLevel(def: LevelDef) {
-        startLevelInternal(def, playSound = true)
+        startLevelInternal(def, playSound = true, customSeed = null)
+    }
+
+    fun restartCurrentRun() {
+        val active = _uiState.value.activeGame
+        val def = active.levelDef ?: return
+        val currentSeed = active.maze?.seedStr?.toLongOrNull()
+        startLevelInternal(def, playSound = true, customSeed = currentSeed)
+    }
+
+    fun finishCurrentRunForExit() {
+        val active = _uiState.value.activeGame
+        if (active.levelDef?.isWolfChase == true && !active.gameOver && !active.isCelebratingWin &&
+            (active.moves > 0 || active.elapsedSec >= getWolfHeadStartSeconds(active.levelDef))
+        ) {
+            consumeWolfGearDurabilityIfNeeded()
+        }
+        pauseTimer()
     }
 
     fun startWolfChaseLevel(wolfLevel: Int) {
@@ -331,7 +362,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         val clamped = wolfLevel.coerceIn(1, MazeConfig.WOLF_MAX_LEVEL)
-        startLevelInternal(MazeConfig.wolfChaseDef(clamped), playSound = true)
+        startLevelInternal(MazeConfig.wolfChaseDef(clamped), playSound = true, customSeed = null)
     }
 
     private fun computeLevelTimeLimitSec(def: LevelDef, equippedGearId: String): Int {
@@ -363,7 +394,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         return if (isWolfChase && normalizedGear == "compass_vision" && hasDurability) baseVision + 3 else baseVision
     }
 
-    private fun startLevelInternal(def: LevelDef, playSound: Boolean) {
+    private fun startLevelInternal(def: LevelDef, playSound: Boolean, customSeed: Long? = null) {
         if (playSound) {
             soundManager.playClick()
         }
@@ -372,8 +403,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val hasGearDurability = progress.getGearDurability(equippedGear) > 0
         val activeGear = if (hasGearDurability) equippedGear else ""
         val adjustedDef = def.copy(vision = adjustVisionForGear(def.vision, activeGear, def.isWolfChase))
-        val seed = MazeBuilder.randomSeed()
-        val levelData = MazeGenerator.generateFromDef(adjustedDef, seed.toLong())
+        val seed = customSeed ?: MazeBuilder.randomSeed().toLong()
+        val levelData = MazeGenerator.generateFromDef(adjustedDef, seed)
         val maze = levelData.toMaze()
         val distCache = MazeSolver.computeDistances(maze)
         val goalDistCache = MazeSolver.computeDistancesToGoal(maze)
@@ -535,7 +566,24 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        val targetStage = stage ?: currentP.dailyStage.coerceIn(1, 3)
+        val allowedStage = currentP.dailyStage.coerceIn(1, 3)
+        val targetStage = stage ?: allowedStage
+        if (targetStage > allowedStage) {
+            _uiState.update {
+                it.copy(
+                    toastMessage = if (it.language == AppLanguage.VI) "🔒 Hãy hoàn thành Chặng $allowedStage trước!" else "🔒 Clear Stage $allowedStage first!"
+                )
+            }
+            return
+        }
+
+        // Tăng số lượt thử thách đã dùng trong ngày ngay khi bắt đầu lượt chơi
+        viewModelScope.launch {
+            mutateProgress { p ->
+                p.copy(dailyAttemptsUsed = p.dailyAttemptsUsed + 1)
+            }
+        }
+
         val todayDate = DailyChallengeManager.getTodayDateKey()
         val size = DailyChallengeManager.getDailySize(targetStage)
         val target = DailyChallengeManager.getDailyTarget(targetStage)
@@ -1372,10 +1420,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         soundManager.playLose()
         val game = _uiState.value.activeGame
         val isWolfChase = game.levelDef?.isWolfChase == true
+        val oldProgress = _uiState.value.progress
         val (updatedProgress, brokenMsg) = if (isWolfChase && !game.gearDurabilityConsumedInRun) {
-            applyWolfGearDurabilityConsumption(_uiState.value.progress)
+            applyWolfGearDurabilityConsumption(oldProgress)
         } else {
-            _uiState.value.progress to null
+            oldProgress to null
         }
         val finalMsg = if (brokenMsg != null) "$reason\n$brokenMsg" else reason
         _uiState.update {
@@ -1389,11 +1438,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 )
             )
         }
-        if (updatedProgress != _uiState.value.progress) {
-            viewModelScope.launch {
-                repository.saveProgress(updatedProgress)
-            }
-        } else if (isWolfChase) {
+        if (updatedProgress != oldProgress || isWolfChase) {
             viewModelScope.launch {
                 repository.saveProgress(updatedProgress)
             }
@@ -2711,11 +2756,55 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun addCoins(amount: Int) {
-        val currentProgress = _uiState.value.progress
         viewModelScope.launch {
-            val newProgress = currentProgress.copy(coins = currentProgress.coins + amount)
-            repository.saveProgress(newProgress)
-            _uiState.update { it.copy(progress = newProgress) }
+            mutateProgress { currentProgress ->
+                currentProgress.copy(coins = currentProgress.coins + amount)
+            }
+        }
+    }
+
+    fun completeOneLineLevel(levelIndex: Int, activity: Activity?) {
+        viewModelScope.launch {
+            mutateProgress { p ->
+                val nextLevel = levelIndex + 1
+                val isNewUnlock = nextLevel > p.oneLineHighestUnlocked
+                val newHighest = maxOf(p.oneLineHighestUnlocked, nextLevel)
+                val earnedCoins = if (isNewUnlock) 60 else 30
+                p.copy(
+                    oneLineHighestUnlocked = newHighest,
+                    coins = p.coins + earnedCoins
+                )
+            }
+            soundManager.playWin()
+            hapticManager.performWinFeedback()
+            onOneLineGameCleared(activity)
+        }
+    }
+
+    fun deleteAccountAndData() {
+        viewModelScope.launch {
+            repository.resetAllProgress()
+            val prefs = getApplication<Application>().getSharedPreferences("gamets_prefs", android.content.Context.MODE_PRIVATE)
+            prefs.edit().clear().apply()
+            val initialProgress = GameProgressEntity(
+                id = 1,
+                highestCleared = 0,
+                totalStars = 0,
+                coins = 100,
+                gems = 0,
+                hintCount = 1,
+                skipTokens = 1,
+                impossibleCleared = 0,
+                superCleared = false
+            )
+            _uiState.update {
+                it.copy(
+                    progress = initialProgress,
+                    currentScreen = AppScreen.HOME,
+                    activeGame = ActiveGameState(),
+                    toastMessage = if (it.language == AppLanguage.VI) "Đã xóa toàn bộ tài khoản và dữ liệu thành công!" else "Account and all data deleted successfully!"
+                )
+            }
         }
     }
 

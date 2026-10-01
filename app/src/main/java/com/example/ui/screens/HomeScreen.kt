@@ -19,21 +19,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.HelpOutline
-import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MusicOff
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.VolumeOff
@@ -53,44 +53,42 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
+import com.example.core.engine.LevelDef
 import com.example.core.engine.MazeConfig
 import com.example.core.i18n.AppLanguage
 import com.example.core.i18n.Strings
-import com.example.data.shop.ShopCatalog
+import com.example.ui.components.CloudSyncDialog
 import com.example.ui.components.GlowingProgressBar
-import kotlinx.coroutines.launch
 import com.example.ui.components.LanguageToggleSwitch
-import com.example.ui.components.MoveSensitivityCard
-import com.example.ui.components.PremiumSegmentedNav
+import com.example.ui.components.MoveSensitivityDialog
 import com.example.ui.components.TactileImpossibleTierButton
-import com.example.ui.components.TactileLevelButton
+import com.example.ui.components.WolfEquipmentDialog
 import com.example.ui.theme.MazeAmber
-import com.example.ui.theme.MazeAmberGlow
 import com.example.ui.theme.MazeBgDark
-import com.example.ui.theme.MazeCoin
+import com.example.ui.theme.MazeCyan
 import com.example.ui.theme.MazeDanger
 import com.example.ui.theme.MazeEdgeHighlight
 import com.example.ui.theme.MazeStar
+import com.example.ui.theme.MazeSuccess
 import com.example.ui.theme.MazeSurface1
 import com.example.ui.theme.MazeSurface2
 import com.example.ui.theme.MazeTextBody
@@ -99,6 +97,14 @@ import com.example.ui.theme.MazeTextMuted
 import com.example.ui.viewmodel.AppScreen
 import com.example.ui.viewmodel.GameViewModel
 
+/**
+ * Premium Studio "Puzzle Library" Home Screen:
+ * - 1. Top Bar: Brand, Stats Pill (Stars + Coins), and Settings.
+ * - 2. Continue Hero: Highlight current level & one-click play.
+ * - 3. Puzzles Grid: Clean, compact puzzle level selector (1 to 100).
+ * - 4. Special Modes: Wolf Chase, Daily Challenge, One Line, Impossible.
+ * - 5. Bottom Navigation: Shop, Achievements, Leaderboard, Cloud.
+ */
 @Composable
 fun HomeScreen(
     viewModel: GameViewModel,
@@ -111,10 +117,12 @@ fun HomeScreen(
     val lang = uiState.language
 
     var showHelpDialog by remember { mutableStateOf(false) }
-    var displayedLevelCount by remember { mutableIntStateOf(24) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
+    var showSensitivityDialog by remember { mutableStateOf(false) }
     var showResetConfirmDialog by remember { mutableStateOf(false) }
     var resetCheckState by remember { mutableStateOf(false) }
-    var selectedLevelDefForDialog by remember { mutableStateOf<com.example.core.engine.LevelDef?>(null) }
+    var selectedLevelDefForDialog by remember { mutableStateOf<LevelDef?>(null) }
+    var displayedLevelCount by remember { mutableIntStateOf(24) }
 
     val scrollState = rememberScrollState()
 
@@ -123,558 +131,189 @@ fun HomeScreen(
             .fillMaxSize()
             .background(MazeBgDark)
             .verticalScroll(scrollState)
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        // TOP BAR: Brand Icon, Title & Language Switcher
+        // ─────────────────────────────────────────────────────────────
+        // 1. TOP BAR: Brand + Stats Pill + Settings
+        // ─────────────────────────────────────────────────────────────
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Brand Logo & Title
             Row(
-                modifier = Modifier.weight(1f, fill = false),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.ic_app_icon_art),
                     contentDescription = "MazeX Icon",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, MazeAmber.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .border(1.dp, MazeEdgeHighlight, RoundedCornerShape(10.dp))
                 )
-                Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(
-                        text = Strings.appTitle(lang),
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MazeTextH1
+                        text = "MAZEX",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 18.sp,
+                        color = MazeTextH1,
+                        letterSpacing = 1.sp
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = Strings.appSubtitle(lang),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MazeTextBody
+                        text = if (lang == AppLanguage.VI) "Hành trình giải đố" else "Your puzzle journey",
+                        fontSize = 11.sp,
+                        color = MazeTextMuted
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(10.dp))
-
-            // Dedicated Language Switcher Component (VI 🇻🇳 <-> EN 🇬🇧)
-            LanguageToggleSwitch(
-                currentLanguage = lang,
-                onLanguageSelected = { viewModel.setLanguage(it) },
-                isCompact = false
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // VIP ACTIVE TOP BANNER (Đưa thông báo VIP lên trên cùng khi đã kích hoạt)
-        if (progress.vipTier > 0) {
-            Surface(
-                onClick = { viewModel.navigateTo(AppScreen.SHOP) },
-                shape = RoundedCornerShape(14.dp),
-                color = Color(0xFF2B2011),
-                border = BorderStroke(1.5.dp, MazeAmber),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("vip_active_banner_top")
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(MazeAmber.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.WorkspacePremium,
-                                contentDescription = null,
-                                tint = MazeAmber,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = if (lang == AppLanguage.VI) "👑 ĐÃ KÍCH HOẠT VIP ${progress.vipTier} (Đặc quyền tối đa)" else "👑 VIP ${progress.vipTier} ACTIVE (Pro Privileges)",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MazeAmber
-                            )
-                            Text(
-                                text = if (lang == AppLanguage.VI) "Tắt mọi quảng cáo • +15 Gợi ý • +5 Bỏ qua • Tốc độ tối đa" else "No Ads • +15 Hints • +5 Skips • Max Speed",
-                                fontSize = 10.sp,
-                                color = MazeTextBody
-                            )
-                        }
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-        }
-
-        // STATS & UTILITY ROW: VIP Badge, Stars, Coins, Cloud Sync & Help
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Stats Badges
+            // Right Group: Stats Pill & Settings Button
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Nút Cửa Hàng gọn gàng chuẩn Studio
+                // Compact Stats Pill (Stars + Coins)
                 Surface(
                     onClick = { viewModel.navigateTo(AppScreen.SHOP) },
                     shape = RoundedCornerShape(999.dp),
-                    color = Color(0xFF2B2011),
-                    border = BorderStroke(1.dp, MazeAmber),
-                    modifier = Modifier.testTag("home_vip_badge")
+                    color = MazeSurface1,
+                    border = BorderStroke(1.dp, MazeEdgeHighlight)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.WorkspacePremium,
-                            contentDescription = Strings.tabShop(lang),
-                            tint = MazeAmber,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = Strings.tabShop(lang),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MazeAmber
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Icon(Icons.Default.Star, contentDescription = null, tint = MazeStar, modifier = Modifier.size(13.dp))
+                            Text(text = "${progress.totalStars}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MazeTextH1)
+                        }
+
+                        Box(modifier = Modifier.width(1.dp).height(12.dp).background(MazeEdgeHighlight))
+
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Icon(Icons.Default.MonetizationOn, contentDescription = null, tint = MazeAmber, modifier = Modifier.size(13.dp))
+                            Text(text = "${progress.coins}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MazeTextH1)
+                        }
                     }
                 }
 
-                // Total Stars Pill
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(MazeSurface1)
-                        .border(1.dp, MazeEdgeHighlight, RoundedCornerShape(999.dp))
-                        .padding(horizontal = 9.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Settings Button (>= 48dp target)
+                Surface(
+                    onClick = { showSettingsDialog = true },
+                    shape = RoundedCornerShape(12.dp),
+                    color = MazeSurface1,
+                    border = BorderStroke(1.dp, MazeEdgeHighlight),
+                    modifier = Modifier.size(42.dp).testTag("home_settings_btn")
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = "Stars",
-                        tint = MazeStar,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "${progress.totalStars}",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MazeTextH1
-                    )
-                }
-
-                // Coins Pill (Click mở Shop Bản Đồ Màu & Nhân Vật)
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(MazeSurface1)
-                        .border(1.dp, MazeAmber.copy(alpha = 0.6f), RoundedCornerShape(999.dp))
-                        .clickable { viewModel.navigateTo(AppScreen.SHOP) }
-                        .padding(horizontal = 9.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MonetizationOn,
-                        contentDescription = "Coins",
-                        tint = MazeCoin,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "${progress.coins}",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MazeTextH1
-                    )
-                }
-
-                // Nút Trang Bị Vật Phẩm Sói Đuổi & Khiên Hộ Mệnh (Click mở giao diện Trang Bị)
-                val equippedGear = ShopCatalog.getEquipmentById(progress.equippedGearId)
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(MazeSurface1)
-                        .border(1.dp, Color(0xFFF97316).copy(alpha = 0.7f), RoundedCornerShape(999.dp))
-                        .clickable { viewModel.openWolfEquipmentDialog() }
-                        .padding(horizontal = 9.dp, vertical = 5.dp)
-                        .testTag("home_open_wolf_gear_btn"),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                ) {
-                    Text(
-                        text = equippedGear?.iconEmoji ?: "🎒",
-                        fontSize = 12.sp
-                    )
-                    Text(
-                        text = if (lang == AppLanguage.VI) "Trang Bị" else "Gear",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFFEA580C)
-                    )
-                    Text(
-                        text = "🛡️${progress.shieldCount}",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF0284C7)
-                    )
-                }
-            }
-
-            // Quick Tools: Cloud Sync & Help
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                IconButton(
-                    onClick = { viewModel.openCloudSync() },
-                    modifier = Modifier.size(34.dp).testTag("cloud_sync_icon_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CloudSync,
-                        contentDescription = Strings.cloudSyncTitle(lang),
-                        tint = MazeTextBody,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                IconButton(
-                    onClick = { showHelpDialog = true },
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.HelpOutline,
-                        contentDescription = Strings.helpDialogTitle(lang),
-                        tint = MazeTextBody,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = MazeTextH1,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // NAVIGATION: Segmented Control mượt mà (Hôm nay / Xếp hạng / Cửa hàng)
-        PremiumSegmentedNav(
-            selectedScreen = uiState.currentScreen,
-            language = lang,
-            onSelectScreen = { screen -> viewModel.navigateTo(screen) }
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Trạng thái mở khóa của từng chế độ chơi
-        val dailyStageCount = (if (progress.dailyStage1Time > 0 || progress.dailyStage > 1) 1 else 0) +
-                (if (progress.dailyStage2Time > 0 || progress.dailyStage > 2) 1 else 0) +
-                (if (progress.dailyStage3Time > 0 || progress.dailyAllCompleted) 1 else 0)
-        val isDailyCompleted = progress.dailyAllCompleted || dailyStageCount >= 3
-        val isWolfModeUnlocked = progress.highestCleared >= MazeConfig.PASSES_TO_UNLOCK_WOLF_MODE
-        val isOneLineUnlocked = progress.highestCleared >= 20
-        val isImpossibleUnlocked = progress.highestCleared >= MazeConfig.PASSES_TO_UNLOCK_IMPOSSIBLE
-        var showOneLineLockedDialog by remember { mutableStateOf(false) }
-
-        val coroutineScope = rememberCoroutineScope()
-        val levelLazyListState = rememberLazyListState()
+        // ─────────────────────────────────────────────────────────────
+        // 2. HERO CONTINUE CARD (One-click Resume / Play Next Level)
+        // ─────────────────────────────────────────────────────────────
         val currentTargetLevel = when {
             saveSlot != null && saveSlot.defId.toIntOrNull() != null -> saveSlot.defId.toInt()
             else -> minOf(MazeConfig.MAX_LEVEL, progress.highestCleared + 1)
         }
+        val currentLevelDef = MazeConfig.generateLevelDef(currentTargetLevel)
 
-        // Tự động cuộn đến màn chơi hiện tại người chơi đang đạt được
-        LaunchedEffect(currentTargetLevel) {
-            val targetIndex = (currentTargetLevel - 1).coerceAtLeast(0)
-            if (targetIndex > 0) {
-                levelLazyListState.animateScrollToItem(maxOf(0, targetIndex - 1))
-            }
-        }
-
-        // =====================================================================
-        // PHẦN 1 (TRÊN ĐẦU TRANG): CÁC GAME SẴN SÀNG CHƠI NGAY
-        // =====================================================================
-        Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = Color(0xFF0C2B22),
-            border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.6f)),
-            modifier = Modifier.fillMaxWidth()
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MazeSurface1),
+            border = BorderStroke(1.dp, MazeEdgeHighlight),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("continue_hero_card")
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (lang == AppLanguage.VI) "🟢 SẴN SÀNG CHƠI NGAY" else "🟢 READY TO PLAY NOW",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF34D399)
-                )
-                Text(
-                    text = if (lang == AppLanguage.VI) "Chọn màn & vào chơi lập tức" else "Select & play immediately",
-                    fontSize = 10.5.sp,
-                    color = Color(0xFF6EE7B7)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // 1A. RESUME GAME BANNER (nếu có ván đang chơi dở)
-        if (saveSlot != null) {
-            Card(
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MazeSurface1),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, MazeAmber.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
-                    .testTag("resume_card")
-            ) {
+            Column(modifier = Modifier.padding(16.dp)) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        val title = if (saveSlot.defId.startsWith("IMPOSSIBLE")) {
-                            "${Strings.superTierTitle(lang)} (${Strings.tierLabel(lang, saveSlot.tier ?: "1")})"
+                    Text(
+                        text = if (saveSlot != null) {
+                            if (lang == AppLanguage.VI) "TIẾP TỤC VÁN CHƠI" else "CONTINUE GAME"
                         } else {
-                            "Level ${saveSlot.defId}"
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = Strings.resumeGameTitle(lang),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MazeAmber
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = MazeAmber.copy(alpha = 0.2f),
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            ) {
-                                Text(
-                                    text = title,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MazeAmber,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(2.dp))
+                            if (lang == AppLanguage.VI) "MÀN TIẾP THEO" else "NEXT PUZZLE"
+                        },
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MazeAmber,
+                        letterSpacing = 0.5.sp
+                    )
+
+                    Text(
+                        text = "${progress.highestCleared} / ${MazeConfig.MAX_LEVEL} ${if (lang == AppLanguage.VI) "Đã hoàn thành" else "Solved"}",
+                        fontSize = 11.sp,
+                        color = MazeTextMuted
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
                         Text(
-                            text = Strings.resumeGameSub(lang, saveSlot.moves, saveSlot.elapsedSec),
-                            fontSize = 11.sp,
+                            text = "LEVEL $currentTargetLevel",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MazeTextH1
+                        )
+                        Text(
+                            text = "${currentLevelDef.w} × ${currentLevelDef.h} • ${Strings.stepsUnit(lang, currentLevelDef.target)}",
+                            fontSize = 12.sp,
                             color = MazeTextBody
                         )
                     }
 
                     Button(
-                        onClick = { viewModel.resumeFromSave() },
-                        colors = ButtonDefaults.buttonColors(containerColor = MazeAmber, contentColor = Color(0xFF0F172A)),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.height(34.dp).testTag("resume_button"),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 0.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(Strings.resumeButton(lang), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-        }
-
-        // 1B. GAME MÊ CUNG CHÍNH (Màn 1 → 100: Màn 1-50 xen kẽ TT 1,2 • Màn 51-100 xen kẽ TT 2,3) — LUÔN SẴN SÀNG CHƠI TRÊN ĐẦU TRANG
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MazeSurface1),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.2.dp, MazeAmber.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                // Hàng 1: Tiêu đề Danh Sách Cấp Độ bên trái + Nút Chơi Màn bên phải (tách biệt rõ ràng, không đè chữ)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = Strings.levelListTitle(lang),
-                        fontSize = 15.sp,
-                        lineHeight = 19.sp,
-                        maxLines = 1,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MazeTextH1,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Button(
                         onClick = {
-                            if (saveSlot?.defId == currentTargetLevel.toString()) {
+                            if (saveSlot != null) {
                                 viewModel.resumeFromSave()
                             } else {
-                                viewModel.startLevel(MazeConfig.generateLevelDef(currentTargetLevel))
+                                viewModel.startLevel(currentLevelDef)
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MazeAmber,
-                            contentColor = Color(0xFF0F172A)
-                        ),
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                        modifier = Modifier.height(36.dp).testTag("play_current_normal_level_btn")
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MazeAmber, contentColor = Color(0xFF090B16)),
+                        modifier = Modifier.height(44.dp).testTag("home_hero_play_btn")
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (lang == AppLanguage.VI) "Chơi Màn #$currentTargetLevel" else "Play #$currentTargetLevel",
-                            fontSize = 11.5.sp,
-                            maxLines = 1,
-                            softWrap = false,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Hàng 2: Các thẻ thông tin tiến độ & cỡ bản đồ hiện tại (nằm gọn gàng trên dòng riêng)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFF10B981).copy(alpha = 0.15f)
-                    ) {
-                        Text(
-                            text = if (lang == AppLanguage.VI) {
-                                "Đã vượt: ${progress.highestCleared}/${MazeConfig.MAX_LEVEL}"
-                            } else {
-                                "Cleared: ${progress.highestCleared}/${MazeConfig.MAX_LEVEL}"
-                            },
-                            fontSize = 10.5.sp,
-                            lineHeight = 14.sp,
-                            maxLines = 1,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF059669),
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                        )
-                    }
-
-                    val targetSize = MazeConfig.mapSizeForLevel(currentTargetLevel)
-                    val targetAlg = MazeConfig.algorithmIndexForLevel(currentTargetLevel)
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFF0284C7).copy(alpha = 0.12f)
-                    ) {
-                        Text(
-                            text = if (lang == AppLanguage.VI) {
-                                "Màn #$currentTargetLevel: ${targetSize}×${targetSize} • Thuật toán $targetAlg"
-                            } else {
-                                "Lv #$currentTargetLevel: ${targetSize}×${targetSize} • Alg $targetAlg"
-                            },
-                            fontSize = 10.5.sp,
-                            lineHeight = 14.sp,
-                            maxLines = 1,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0284C7),
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = if (lang == AppLanguage.VI) {
-                        "🧩 Màn 1–50: Xen kẽ Thuật toán 1 & 2 • Màn 51–100: Xen kẽ Thuật toán 2 & 3 (2 màn / 1 cỡ bản đồ)"
-                    } else {
-                        "🧩 Lv 1–50: Alternate Alg 1 & 2 • Lv 51–100: Alternate Alg 2 & 3 (2 levels per map size)"
-                    },
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp,
-                    color = MazeTextBody,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Thanh chuyển nhanh theo khoảng Màn chơi (Màn 1 -> 100)
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    val tiers = listOf(
-                        Strings.jumpPlayingNow(lang) to currentTargetLevel,
-                        "1 - 25 (5×5→17×17)" to 1,
-                        "26 - 50 (17×17→29×29)" to 26,
-                        "51 - 75 (30×30→42×42)" to 51,
-                        "76 - 100 (42×42→54×54)" to 76
-                    )
-                    items(tiers) { (label, jumpLevel) ->
-                        val isSelected = (jumpLevel == currentTargetLevel) || (jumpLevel != currentTargetLevel && currentTargetLevel in jumpLevel..(jumpLevel + 24))
-                        Surface(
-                            onClick = {
-                                coroutineScope.launch {
-                                    val targetIndex = (jumpLevel - 1).coerceAtLeast(0)
-                                    levelLazyListState.animateScrollToItem(maxOf(0, targetIndex - 1))
-                                }
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) MazeAmber.copy(alpha = 0.2f) else MazeSurface2,
-                            border = BorderStroke(1.dp, if (isSelected) MazeAmber else MazeEdgeHighlight)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
-                                text = label,
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) MazeAmber else MazeTextBody,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                text = if (lang == AppLanguage.VI) "CHƠI NGAY" else "PLAY",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 13.sp
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
@@ -682,713 +321,512 @@ fun HomeScreen(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // HORIZONTAL SCROLLING LEVEL MAP VỚI TỰ ĐỘNG CUỘN & PHÓNG TO MÀN ĐẠT ĐƯỢC
-                val maxToShow = minOf(MazeConfig.MAX_LEVEL, maxOf(progress.highestCleared + 5, displayedLevelCount))
-                val levelList = remember(maxToShow) { (1..maxToShow).toList() }
+                GlowingProgressBar(
+                    progress = (progress.highestCleared.toFloat() / MazeConfig.MAX_LEVEL.toFloat()).coerceIn(0f, 1f),
+                    activeColor = MazeAmber,
+                    glowColor = MazeAmber,
+                    trackColor = MazeSurface2
+                )
+            }
+        }
 
-                LazyRow(
-                    state = levelLazyListState,
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ─────────────────────────────────────────────────────────────
+        // 3. PUZZLES LIBRARY (Compact Level Grid / Selector)
+        // ─────────────────────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (lang == AppLanguage.VI) "DANH SÁCH MÀN CHƠI" else "PUZZLES",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MazeTextH1,
+                letterSpacing = 0.5.sp
+            )
+
+            Text(
+                text = "1 – $displayedLevelCount",
+                fontSize = 12.sp,
+                color = MazeTextMuted
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Grid of Compact Level Buttons
+        val levelRows = (1..displayedLevelCount).chunked(4)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (row in levelRows) {
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(levelList, key = { it }) { levelNum ->
+                    for (levelNum in row) {
                         val def = MazeConfig.generateLevelDef(levelNum)
                         val isCleared = levelNum <= progress.highestCleared
-                        val reqStars = MazeConfig.starReqFor(levelNum)
-                        val isUnlocked = (levelNum <= progress.highestCleared + 1) && (reqStars == 0 || progress.totalStars >= reqStars)
-                        val starsEarned = records[levelNum.toString()]?.stars ?: 0
-                        val isSaved = saveSlot?.defId == levelNum.toString()
-                        val isCurrentTarget = (levelNum == currentTargetLevel)
+                        val isCurrent = levelNum == progress.highestCleared + 1
+                        val isLocked = levelNum > progress.highestCleared + 1
+                        val stars = records[def.id]?.stars ?: (if (isCleared) 3 else 0)
 
-                        TactileLevelButton(
-                            levelNumber = levelNum,
-                            size = def.w,
-                            isUnlocked = isUnlocked,
-                            isCleared = isCleared,
-                            starsEarned = starsEarned,
-                            reqStars = reqStars,
-                            currentStars = progress.totalStars,
-                            isSaved = isSaved,
-                            isCurrentTarget = isCurrentTarget,
+                        Surface(
                             onClick = {
-                                if (isSaved) {
-                                    viewModel.resumeFromSave()
-                                } else if (isCleared) {
+                                if (isCleared) {
                                     selectedLevelDefForDialog = def
-                                } else {
+                                } else if (isCurrent) {
                                     viewModel.startLevel(def)
                                 }
-                            }
-                        )
-                    }
-                }
-
-                if (displayedLevelCount < MazeConfig.MAX_LEVEL) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedButton(
-                        onClick = { displayedLevelCount = minOf(MazeConfig.MAX_LEVEL, displayedLevelCount + 20) },
-                        modifier = Modifier.align(Alignment.CenterHorizontally),
-                        shape = RoundedCornerShape(12.dp),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(brush = Brush.linearGradient(listOf(MazeEdgeHighlight, MazeEdgeHighlight)))
-                    ) {
-                        Text(Strings.showMoreLevels(lang), fontSize = 12.sp, color = MazeTextBody)
-                    }
-                }
-            }
-        }
-
-        // 1C. ĐUA TỐC ĐỘ NGÀY (Hiện trên đầu trang nếu hôm nay còn lượt sẵn sàng chơi)
-        if (!isDailyCompleted) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Card(
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MazeSurface1),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, MazeAmber.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
-                    .clickable { viewModel.navigateTo(AppScreen.DAILY_CHALLENGE) }
-                    .testTag("daily_challenge_banner")
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                        Box(
+                            },
+                            enabled = !isLocked,
+                            shape = RoundedCornerShape(12.dp),
+                            color = when {
+                                isCurrent -> MazeAmber.copy(alpha = 0.15f)
+                                isCleared -> MazeSurface1
+                                else -> MazeSurface2
+                            },
+                            border = BorderStroke(
+                                1.dp,
+                                when {
+                                    isCurrent -> MazeAmber
+                                    isCleared -> MazeEdgeHighlight
+                                    else -> Color.Transparent
+                                }
+                            ),
                             modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(MazeAmber.copy(alpha = 0.18f)),
-                            contentAlignment = Alignment.Center
+                                .weight(1f)
+                                .height(56.dp)
+                                .testTag("level_btn_$levelNum")
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.LocalFireDepartment,
-                                contentDescription = "Challenge",
-                                tint = MazeAmber,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = Strings.dailyBannerTitle(lang),
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = MazeTextH1
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(5.dp),
-                                    color = MazeAmber.copy(alpha = 0.2f)
-                                ) {
-                                    Text(
-                                        text = if (lang == AppLanguage.VI) "$dailyStageCount/3 LƯỢT" else "$dailyStageCount/3 RUNS",
-                                        fontSize = 9.5.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = MazeAmber,
-                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
+                            Column(
+                                modifier = Modifier.fillMaxSize().padding(4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                if (isLocked) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = "Locked",
+                                        tint = MazeTextMuted,
+                                        modifier = Modifier.size(14.dp)
                                     )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "$levelNum",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MazeTextMuted
+                                    )
+                                } else {
+                                    Text(
+                                        text = "$levelNum",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = if (isCurrent) MazeAmber else MazeTextH1
+                                    )
+                                    if (isCleared) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            for (s in 1..3) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Star,
+                                                    contentDescription = null,
+                                                    tint = if (s <= stars) MazeStar else MazeTextMuted.copy(alpha = 0.4f),
+                                                    modifier = Modifier.size(9.dp)
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        Text(
+                                            text = "${def.w}×${def.h}",
+                                            fontSize = 9.sp,
+                                            color = MazeAmber,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
                                 }
                             }
-                            Text(
-                                text = if (lang == AppLanguage.VI) "Sẵn sàng đua tốc độ 3 chặng (14×14 → 16×16) nhận Xu & Sao!" else "Ready for 3 daily speed stages (14×14 → 16×16)!",
-                                fontSize = 11.sp,
-                                color = MazeTextBody
-                            )
                         }
-                    }
-
-                    Surface(
-                        onClick = { viewModel.navigateTo(AppScreen.DAILY_CHALLENGE) },
-                        shape = RoundedCornerShape(8.dp),
-                        color = MazeAmber
-                    ) {
-                        Text(
-                            text = Strings.speedRace(lang),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF0F172A),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
                     }
                 }
             }
         }
 
-        // 1D. CHẾ ĐỘ SÓI TRUY ĐUỔI (Hiện ở nhóm SẴN SÀNG CHƠI trên đầu trang khi đã mở khóa >= Màn 10)
-        val nextWolfLevel = (progress.wolfHighestCleared + 1).coerceIn(1, MazeConfig.WOLF_MAX_LEVEL)
-        if (isWolfModeUnlocked) {
-            Spacer(modifier = Modifier.height(12.dp))
-            WolfChasePlayableCard(
-                progress = progress,
-                lang = lang,
-                nextWolfLevel = nextWolfLevel,
-                onPlayWolfLevel = { lvl -> viewModel.startWolfChaseLevel(lvl) },
-                onOpenWolfEquipment = { viewModel.openWolfEquipmentDialog() }
-            )
-        }
-
-        // 1E. MINI-GAME VẼ 1 NÉT (Hiện ở nhóm SẴN SÀNG CHƠI trên đầu trang khi đã mở khóa >= Màn 20)
-        if (isOneLineUnlocked) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MazeSurface1),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { viewModel.navigateTo(AppScreen.ONELINE_GAME) }
-                    .border(1.2.dp, Color(0xFF10B981).copy(alpha = 0.7f), RoundedCornerShape(16.dp))
-                    .testTag("oneline_minigame_card")
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFF10B981).copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(text = "✏️", fontSize = 21.sp)
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = Strings.oneLineCardTitle(lang),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF34D399)
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = Strings.oneLineUnlockedDesc(lang),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MazeTextBody
-                            )
-                        }
-                    }
-
-                    Button(
-                        onClick = { viewModel.navigateTo(AppScreen.ONELINE_GAME) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF10B981),
-                            contentColor = Color(0xFF0F172A)
-                        )
-                    ) {
-                        Text(Strings.play(lang), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.Default.ArrowForward,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        // 1F. CHẾ ĐỘ IMPOSSIBLE & SIÊU CẤP (Hiện ở nhóm SẴN SÀNG CHƠI trên đầu trang khi đã mở khóa >= Màn 50)
-        if (isImpossibleUnlocked) {
-            Spacer(modifier = Modifier.height(12.dp))
-            ImpossibleModeCard(
-                progress = progress,
-                saveSlot = saveSlot,
-                lang = lang,
-                isImpossibleUnlocked = true,
-                onSelectClearedDef = { selectedLevelDefForDialog = it },
-                onStartDef = { viewModel.startLevel(it) },
-                onResume = { viewModel.resumeFromSave() }
-            )
-        }
-
-        // =====================================================================
-        // PHẦN 2 (Ở DƯỚI TRANG): GAME CẦN LÀM GÌ & MỞ KHI NÀO (CHƯA MỞ KHÓA / CHỜ LÀM MỚI)
-        // =====================================================================
-        val hasBelowSection = !isWolfModeUnlocked || !isOneLineUnlocked || !isImpossibleUnlocked || isDailyCompleted
-        if (hasBelowSection) {
-            Spacer(modifier = Modifier.height(22.dp))
-
-            Surface(
+        if (displayedLevelCount < MazeConfig.MAX_LEVEL) {
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { displayedLevelCount = (displayedLevelCount + 24).coerceAtMost(MazeConfig.MAX_LEVEL) },
                 shape = RoundedCornerShape(10.dp),
-                color = Color(0xFF261D10),
-                border = BorderStroke(1.dp, MazeAmber.copy(alpha = 0.6f)),
-                modifier = Modifier.fillMaxWidth()
+                border = BorderStroke(1.dp, MazeEdgeHighlight),
+                modifier = Modifier.fillMaxWidth().height(40.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (lang == AppLanguage.VI) "🔒 CHẾ ĐỘ SẮP MỞ KHÓA • CẦN LÀM GÌ & MỞ KHI NÀO" else "🔒 UPCOMING MODES • WHAT TO DO & WHEN TO UNLOCK",
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MazeAmber
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // 2A. THỬ THÁCH SÓI TRUY ĐUỔI (Khi chưa mở khóa < Màn 10)
-            if (!isWolfModeUnlocked) {
-                val remToUnlockWolf = maxOf(1, MazeConfig.PASSES_TO_UNLOCK_WOLF_MODE - progress.highestCleared)
-                val wolfUnlockProg = (progress.highestCleared.toFloat() / MazeConfig.PASSES_TO_UNLOCK_WOLF_MODE.toFloat()).coerceIn(0f, 1f)
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MazeSurface1),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, Color(0xFFF97316).copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-                        .testTag("wolf_chase_mode_card")
-                ) {
-                    Column(modifier = Modifier.padding(15.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = "🐺", fontSize = 20.sp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text(
-                                        text = if (lang == AppLanguage.VI) "THỬ THÁCH SÓI TRUY ĐUỔI (5×5 → 30×30)" else "WOLF CHASE CHALLENGE (5×5 → 30×30)",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Color(0xFFF97316)
-                                    )
-                                    Text(
-                                        text = if (lang == AppLanguage.VI) {
-                                            "⏰ Mở khi nào: Khi vượt qua Màn ${MazeConfig.PASSES_TO_UNLOCK_WOLF_MODE} Mê Cung Chính"
-                                        } else {
-                                            "⏰ Unlocks when: Clearing Normal Level ${MazeConfig.PASSES_TO_UNLOCK_WOLF_MODE}"
-                                        },
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFFDBA74)
-                                    )
-                                }
-                            }
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MazeSurface2
-                            ) {
-                                Text(
-                                    text = "${progress.highestCleared}/${MazeConfig.PASSES_TO_UNLOCK_WOLF_MODE}",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = MazeAmber,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-                        GlowingProgressBar(
-                            progress = wolfUnlockProg,
-                            activeColor = Color(0xFFF97316),
-                            glowColor = MazeAmberGlow,
-                            trackColor = MazeSurface2
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Text(
-                            text = if (lang == AppLanguage.VI) {
-                                "📌 Cần làm gì: Vượt thêm $remToUnlockWolf màn thường nữa để mở khóa!\n" +
-                                "🎒 Trang bị hỗ trợ màn Sói: Giày Thần Tốc (+15s), Khiên Aegis Cổ Đại (+1 Khiên miễn phí), La Bàn Tiên Tri (Radar hướng đích)."
-                            } else {
-                                "📌 What to do: Clear $remToUnlockWolf more Normal levels to unlock!\n" +
-                                "🎒 Wolf Gear: Haste Boots (+15s), Ancient Aegis Shield (+1 free Shield), Oracle Compass (Goal Radar)."
-                            },
-                            fontSize = 11.5.sp,
-                            color = MazeTextBody,
-                            lineHeight = 16.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = { viewModel.openWolfEquipmentDialog() },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFF97316),
-                                    contentColor = Color.White
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f).height(36.dp)
-                            ) {
-                                Text(
-                                    text = if (lang == AppLanguage.VI) "🎒 Mở Trang Bị Sói Đuổi" else "🎒 Open Wolf Gear",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
-                            }
-                            OutlinedButton(
-                                onClick = { viewModel.startLevel(MazeConfig.generateLevelDef(currentTargetLevel)) },
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, MazeAmber),
-                                modifier = Modifier.height(36.dp)
-                            ) {
-                                Text(
-                                    text = if (lang == AppLanguage.VI) "Chơi Màn #$currentTargetLevel" else "Play #$currentTargetLevel",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MazeAmber
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            // 2B. MINI-GAME VẼ 1 NÉT (Khi chưa mở khóa < Màn 20)
-            if (!isOneLineUnlocked) {
-                val remToUnlockOneLine = maxOf(1, 20 - progress.highestCleared)
-                val oneLineProg = (progress.highestCleared.toFloat() / 20f).coerceIn(0f, 1f)
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MazeSurface1),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showOneLineLockedDialog = true }
-                        .border(1.dp, MazeEdgeHighlight, RoundedCornerShape(16.dp))
-                        .testTag("oneline_minigame_card")
-                ) {
-                    Column(modifier = Modifier.padding(15.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(42.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(MazeSurface2),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(text = "🔒", fontSize = 20.sp)
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(
-                                        text = Strings.oneLineCardTitle(lang),
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = MazeTextH1
-                                    )
-                                    Text(
-                                        text = if (lang == AppLanguage.VI) {
-                                            "⏰ Mở khi nào: Khi vượt qua Màn 20 Mê Cung Chính"
-                                        } else {
-                                            "⏰ Unlocks when: Clearing Normal Level 20"
-                                        },
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF34D399)
-                                    )
-                                }
-                            }
-
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MazeSurface2
-                            ) {
-                                Text(
-                                    text = "${minOf(20, progress.highestCleared)}/20",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = MazeAmber,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-                        GlowingProgressBar(
-                            progress = oneLineProg,
-                            activeColor = Color(0xFF10B981),
-                            glowColor = MazeAmberGlow,
-                            trackColor = MazeSurface2
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = if (lang == AppLanguage.VI) {
-                                "📌 Cần làm gì: Vượt thêm $remToUnlockOneLine màn thường nữa để mở khóa chế độ Vẽ 1 Nét!"
-                            } else {
-                                "📌 What to do: Clear $remToUnlockOneLine more Normal levels to unlock One-Line Puzzle!"
-                            },
-                            fontSize = 11.5.sp,
-                            color = MazeTextBody
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            // 2C. CHẾ ĐỘ IMPOSSIBLE & SIÊU CẤP (Khi chưa mở khóa < Màn 50)
-            if (!isImpossibleUnlocked) {
-                val clearedCount = minOf(progress.highestCleared, MazeConfig.PASSES_TO_UNLOCK_IMPOSSIBLE)
-                val remToUnlockImp = maxOf(1, MazeConfig.PASSES_TO_UNLOCK_IMPOSSIBLE - progress.highestCleared)
-                val progPercent = clearedCount / MazeConfig.PASSES_TO_UNLOCK_IMPOSSIBLE.toFloat()
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MazeSurface1)
-                        .border(1.dp, MazeEdgeHighlight, RoundedCornerShape(16.dp))
-                        .padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = Strings.impossibleSectionTitle(lang),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MazeTextH1
-                            )
-                            Text(
-                                text = if (lang == AppLanguage.VI) {
-                                    "⏰ Mở khi nào: Khi vượt qua Màn ${MazeConfig.PASSES_TO_UNLOCK_IMPOSSIBLE} Mê Cung Chính"
-                                } else {
-                                    "⏰ Unlocks when: Clearing Normal Level ${MazeConfig.PASSES_TO_UNLOCK_IMPOSSIBLE}"
-                                },
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MazeAmber
-                            )
-                        }
-                        Text(
-                            text = Strings.levelsProgress(lang, clearedCount, MazeConfig.PASSES_TO_UNLOCK_IMPOSSIBLE),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MazeAmber
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    GlowingProgressBar(
-                        progress = progPercent,
-                        activeColor = MazeAmber,
-                        glowColor = MazeAmberGlow,
-                        trackColor = MazeSurface2
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = if (lang == AppLanguage.VI) {
-                            "📌 Cần làm gì: Vượt thêm $remToUnlockImp màn thường nữa để mở khóa mê cung khổng lồ 75×75 → 1000×1000!"
-                        } else {
-                            "📌 What to do: Clear $remToUnlockImp more Normal levels to unlock giant 75×75 → 1000×1000 mazes!"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MazeTextBody
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            // 2D. ĐUA TỐC ĐỘ NGÀY (Khi đã hoàn thành cả 3/3 lượt hôm nay -> Hiển thị ở dưới chờ làm mới ngày mai)
-            if (isDailyCompleted) {
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MazeSurface1),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, Color(0xFF10B981).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                        .clickable { viewModel.navigateTo(AppScreen.DAILY_CHALLENGE) }
-                        .testTag("daily_challenge_banner")
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "✓ ${Strings.dailyBannerTitle(lang)} (3/3)",
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color(0xFF10B981)
-                            )
-                            Text(
-                                text = if (lang == AppLanguage.VI) {
-                                    "⏰ Mở khi nào: Làm mới 3 lượt đua mới vào 00:00 ngày mai"
-                                } else {
-                                    "⏰ Unlocks when: Resets 3 new runs at 00:00 tomorrow"
-                                },
-                                fontSize = 11.sp,
-                                color = MazeTextBody
-                            )
-                        }
-                        Surface(
-                            onClick = { viewModel.navigateTo(AppScreen.DAILY_CHALLENGE) },
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFF10B981)
-                        ) {
-                            Text(
-                                text = if (lang == AppLanguage.VI) "Xem Lại" else "Replay",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color(0xFF0F172A),
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                            )
-                        }
-                    }
-                }
+                Text(
+                    text = if (lang == AppLanguage.VI) "Xem thêm màn chơi..." else "Load more levels...",
+                    fontSize = 12.sp,
+                    color = MazeTextBody
+                )
             }
         }
 
-        // Popup Dialog thông báo khóa One-Line
-        if (showOneLineLockedDialog) {
-            AlertDialog(
-                onDismissRequest = { showOneLineLockedDialog = false },
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = Strings.locked(lang),
-                            tint = MazeAmber
-                        )
-                        Text(
-                            text = Strings.oneLineLockedDialogTitle(lang),
-                            fontWeight = FontWeight.Bold,
-                            color = MazeTextH1,
-                            fontSize = 17.sp
-                        )
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // ─────────────────────────────────────────────────────────────
+        // 4. SPECIAL MODES SECTION
+        // ─────────────────────────────────────────────────────────────
+        Text(
+            text = if (lang == AppLanguage.VI) "CHẾ ĐỘ ĐẶC BIỆT" else "SPECIAL MODES",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = MazeTextH1,
+            letterSpacing = 0.5.sp
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        val isWolfUnlocked = progress.highestCleared >= MazeConfig.PASSES_TO_UNLOCK_WOLF_MODE
+        val isOneLineUnlocked = progress.highestCleared >= 20
+        val isImpossibleUnlocked = progress.highestCleared >= MazeConfig.PASSES_TO_UNLOCK_IMPOSSIBLE
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // 4A. Wolf Chase Mode Card
+            SpecialModeItem(
+                title = if (lang == AppLanguage.VI) "SÓI TRUY ĐUỔI" else "WOLF CHASE",
+                subtitle = "5×5 → 30×30 • Real-time chase",
+                tag = if (isWolfUnlocked) "${progress.wolfHighestCleared}/100" else "Level 5 to unlock",
+                isUnlocked = isWolfUnlocked,
+                accentColor = Color(0xFFF97316),
+                onClick = {
+                    if (isWolfUnlocked) {
+                        viewModel.startWolfChaseLevel((progress.wolfHighestCleared + 1).coerceAtMost(MazeConfig.WOLF_MAX_LEVEL))
                     }
-                },
-                text = {
-                    Text(
-                        text = Strings.oneLineLockedDialogBody(lang, minOf(20, progress.highestCleared)),
-                        color = MazeTextBody,
-                        fontSize = 14.sp
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = { showOneLineLockedDialog = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = MazeAmber, contentColor = Color(0xFF0F172A))
-                    ) {
-                        Text(Strings.understood(lang), fontWeight = FontWeight.Bold)
+                }
+            )
+
+            // 4B. Daily Challenge Mode Card
+            val dailyDone = progress.dailyAllCompleted || (progress.dailyStage1Time > 0 && progress.dailyStage2Time > 0 && progress.dailyStage3Time > 0)
+            SpecialModeItem(
+                title = if (lang == AppLanguage.VI) "THỬ THÁCH NGÀY" else "DAILY CHALLENGE",
+                subtitle = if (lang == AppLanguage.VI) "3 câu đố mới mỗi ngày" else "3 fresh puzzles every day",
+                tag = if (dailyDone) "✓ Solved" else "${progress.dailyAttemptsUsed}/3 attempts",
+                isUnlocked = true,
+                accentColor = Color(0xFF10B981),
+                onClick = { viewModel.navigateTo(AppScreen.DAILY_CHALLENGE) }
+            )
+
+            // 4C. One Line Mode Card
+            SpecialModeItem(
+                title = if (lang == AppLanguage.VI) "VẼ MỘT NÉT" else "ONE LINE",
+                subtitle = if (lang == AppLanguage.VI) "Nối toàn bộ ma trận không nhấc tay" else "Draw one continuous path",
+                tag = if (isOneLineUnlocked) "${progress.oneLineHighestUnlocked} / 23" else "Level 20 to unlock",
+                isUnlocked = isOneLineUnlocked,
+                accentColor = MazeCyan,
+                onClick = {
+                    if (isOneLineUnlocked) {
+                        viewModel.navigateTo(AppScreen.ONELINE_GAME)
                     }
-                },
-                containerColor = MazeSurface2
+                }
+            )
+
+            // 4D. Impossible Mode Card
+            SpecialModeItem(
+                title = if (lang == AppLanguage.VI) "MÊ CUNG KHỔNG LỒ" else "IMPOSSIBLE MAZE",
+                subtitle = "300×300 → 1000×1000 • Mega coordinates",
+                tag = if (isImpossibleUnlocked) "Tier ${progress.impossibleCleared + 1}" else "Level 100 to unlock",
+                isUnlocked = isImpossibleUnlocked,
+                accentColor = MazeDanger,
+                onClick = {
+                    if (isImpossibleUnlocked) {
+                        val def = MazeConfig.impossibleDefForTier((progress.impossibleCleared + 1).coerceAtMost(MazeConfig.IMPOSSIBLE_TIER_SIZES.size))
+                        viewModel.startLevel(def)
+                    }
+                }
             )
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // MOVE SENSITIVITY CONTROLLER CARD (Tăng/giảm độ nhạy vuốt và D-Pad)
-        MoveSensitivityCard(
-            sensitivity = progress.moveSensitivity,
-            onSensitivityChange = { viewModel.setMoveSensitivity(it) },
-            lang = lang,
-            modifier = Modifier.fillMaxWidth()
+        // ─────────────────────────────────────────────────────────────
+        // 5. BOTTOM NAVIGATION & SHORTCUTS (Shop, Achievements, Leaderboard, Gear)
+        // ─────────────────────────────────────────────────────────────
+        Text(
+            text = if (lang == AppLanguage.VI) "KHÁM PHÁ THÊM" else "MORE",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = MazeTextH1,
+            letterSpacing = 0.5.sp
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // AUDIO, HAPTIC & LANGUAGE SETTINGS
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(MazeSurface1)
-                .border(1.dp, MazeEdgeHighlight, RoundedCornerShape(16.dp))
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                IconButton(onClick = { viewModel.toggleSound() }) {
-                    Icon(
-                        imageVector = if (progress.soundEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
-                        contentDescription = Strings.soundLabel(lang),
-                        tint = if (progress.soundEnabled) MazeAmber else MazeTextBody
-                    )
-                }
-                IconButton(onClick = { viewModel.toggleMusic() }) {
-                    Icon(
-                        imageVector = if (progress.musicEnabled) Icons.Default.MusicNote else Icons.Default.MusicOff,
-                        contentDescription = Strings.musicLabel(lang),
-                        tint = if (progress.musicEnabled) MazeAmber else MazeTextBody
-                    )
-                }
-                IconButton(onClick = { viewModel.toggleHaptics() }) {
-                    Icon(
-                        imageVector = Icons.Default.Vibration,
-                        contentDescription = Strings.hapticLabel(lang),
-                        tint = if (progress.hapticEnabled) MazeAmber else MazeTextBody
-                    )
-                }
-            }
+            MoreShortcutButton(
+                label = Strings.tabShop(lang),
+                icon = Icons.Default.WorkspacePremium,
+                onClick = { viewModel.navigateTo(AppScreen.SHOP) },
+                modifier = Modifier.weight(1f)
+            )
 
-            LanguageToggleSwitch(
-                currentLanguage = lang,
-                onLanguageSelected = { viewModel.setLanguage(it) },
-                isCompact = false
+            MoreShortcutButton(
+                label = Strings.tabLeaderboard(lang),
+                icon = Icons.Default.Star,
+                onClick = { viewModel.navigateTo(AppScreen.LEADERBOARD) },
+                modifier = Modifier.weight(1f)
+            )
+
+            MoreShortcutButton(
+                label = Strings.tabAchievements(lang),
+                icon = Icons.Default.MonetizationOn,
+                onClick = { viewModel.navigateTo(AppScreen.ACHIEVEMENTS) },
+                modifier = Modifier.weight(1f)
+            )
+
+            MoreShortcutButton(
+                label = if (lang == AppLanguage.VI) "Trang Bị" else "Gear",
+                icon = Icons.Default.Speed,
+                onClick = { viewModel.openWolfEquipmentDialog() },
+                modifier = Modifier.weight(1f)
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Reset progress link
-        TextButton(
-            onClick = { showResetConfirmDialog = true },
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        ) {
-            Text(Strings.resetDataButton(lang), color = MazeTextMuted, fontSize = 11.sp)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
     }
 
-    // Reset Confirmation Dialog
+    // ─────────────────────────────────────────────────────────────
+    // DIALOGS & OVERLAYS
+    // ─────────────────────────────────────────────────────────────
+
+    // Full In-App Settings Dialog
+    if (showSettingsDialog) {
+        AlertDialog(
+            onDismissRequest = { showSettingsDialog = false },
+            containerColor = MazeSurface1,
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text(
+                    text = if (lang == AppLanguage.VI) "Cài Đặt Ứng Dụng" else "Settings",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = MazeTextH1
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Sound & Music Toggles
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (lang == AppLanguage.VI) "Âm thanh & Rung" else "Audio & Haptics",
+                            color = MazeTextBody,
+                            fontSize = 13.sp
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Surface(
+                                onClick = { viewModel.toggleSound() },
+                                shape = CircleShape,
+                                color = if (progress.soundEnabled) MazeAmber.copy(alpha = 0.2f) else MazeSurface2,
+                                border = BorderStroke(1.dp, if (progress.soundEnabled) MazeAmber else MazeEdgeHighlight),
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = if (progress.soundEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                                        contentDescription = "Sound",
+                                        tint = if (progress.soundEnabled) MazeAmber else MazeTextMuted,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                onClick = { viewModel.toggleMusic() },
+                                shape = CircleShape,
+                                color = if (progress.musicEnabled) MazeAmber.copy(alpha = 0.2f) else MazeSurface2,
+                                border = BorderStroke(1.dp, if (progress.musicEnabled) MazeAmber else MazeEdgeHighlight),
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = if (progress.musicEnabled) Icons.Default.MusicNote else Icons.Default.MusicOff,
+                                        contentDescription = "Music",
+                                        tint = if (progress.musicEnabled) MazeAmber else MazeTextMuted,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                onClick = { viewModel.toggleHaptics() },
+                                shape = CircleShape,
+                                color = if (progress.hapticEnabled) MazeAmber.copy(alpha = 0.2f) else MazeSurface2,
+                                border = BorderStroke(1.dp, if (progress.hapticEnabled) MazeAmber else MazeEdgeHighlight),
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Vibration,
+                                        contentDescription = "Haptics",
+                                        tint = if (progress.hapticEnabled) MazeAmber else MazeTextMuted,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Move Sensitivity Option
+                    Surface(
+                        onClick = { showSensitivityDialog = true },
+                        shape = RoundedCornerShape(10.dp),
+                        color = MazeSurface2,
+                        border = BorderStroke(1.dp, MazeEdgeHighlight),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = Strings.sensitivityLabel(lang),
+                                fontSize = 13.sp,
+                                color = MazeTextH1,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "${(progress.moveSensitivity * 100).toInt()}%",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MazeAmber
+                            )
+                        }
+                    }
+
+                    // Language Selection Toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = Strings.languageLabel(lang),
+                            fontSize = 13.sp,
+                            color = MazeTextBody
+                        )
+                        LanguageToggleSwitch(
+                            currentLanguage = lang,
+                            onLanguageSelected = { viewModel.setLanguage(it) },
+                            isCompact = true
+                        )
+                    }
+
+                    // Cloud Sync Trigger
+                    Surface(
+                        onClick = {
+                            showSettingsDialog = false
+                            viewModel.openCloudSync()
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        color = MazeSurface2,
+                        border = BorderStroke(1.dp, MazeEdgeHighlight),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = Strings.cloudSyncTitle(lang),
+                                fontSize = 13.sp,
+                                color = MazeTextH1
+                            )
+                            Icon(Icons.Default.CloudSync, contentDescription = null, tint = MazeCyan, modifier = Modifier.size(18.dp))
+                        }
+                    }
+
+                    // Reset & Account Deletion (Google Play Compliance)
+                    Surface(
+                        onClick = {
+                            showSettingsDialog = false
+                            showResetConfirmDialog = true
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        color = MazeDanger.copy(alpha = 0.1f),
+                        border = BorderStroke(1.dp, MazeDanger.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (lang == AppLanguage.VI) "Xóa tài khoản & Dữ liệu" else "Delete Account & Data",
+                                fontSize = 13.sp,
+                                color = MazeDanger,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "→",
+                                fontSize = 14.sp,
+                                color = MazeDanger,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showSettingsDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = MazeAmber, contentColor = Color(0xFF090B16)),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(if (lang == AppLanguage.VI) "Đóng" else "Close", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
+    // Reset Progress / Delete Data Dialog
     if (showResetConfirmDialog) {
         AlertDialog(
             onDismissRequest = {
                 showResetConfirmDialog = false
                 resetCheckState = false
             },
-            title = { Text(Strings.resetDialogTitle(lang), color = MazeDanger, fontWeight = FontWeight.Bold) },
+            containerColor = MazeSurface1,
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text(
+                    text = if (lang == AppLanguage.VI) "Xóa Tài Khoản & Dữ Liệu?" else "Delete Account & Data?",
+                    fontWeight = FontWeight.Bold,
+                    color = MazeDanger
+                )
+            },
             text = {
                 Column {
-                    Text(Strings.resetDialogBody(lang))
+                    Text(
+                        text = if (lang == AppLanguage.VI)
+                            "Hành động này sẽ xóa toàn bộ tiến trình, số sao, tiền xu và trang bị của bạn về trạng thái ban đầu. Không thể khôi phục sau khi xóa."
+                        else
+                            "This will permanently delete all your progress, stars, coins and items. This cannot be undone.",
+                        fontSize = 13.sp,
+                        color = MazeTextBody
+                    )
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -1398,22 +836,29 @@ fun HomeScreen(
                             checked = resetCheckState,
                             onCheckedChange = { resetCheckState = it }
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(Strings.resetCheckboxLabel(lang), fontSize = 13.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (lang == AppLanguage.VI) "Tôi hiểu và muốn xóa vĩnh viễn" else "I understand and confirm deletion",
+                            fontSize = 12.sp,
+                            color = MazeTextH1
+                        )
                     }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.confirmResetAll()
-                        showResetConfirmDialog = false
-                        resetCheckState = false
+                        if (resetCheckState) {
+                            showResetConfirmDialog = false
+                            resetCheckState = false
+                            viewModel.deleteAccountAndData()
+                        }
                     },
                     enabled = resetCheckState,
-                    colors = ButtonDefaults.buttonColors(containerColor = MazeDanger)
+                    colors = ButtonDefaults.buttonColors(containerColor = MazeDanger),
+                    shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text(Strings.resetConfirmButton(lang))
+                    Text(if (lang == AppLanguage.VI) "Xác nhận xóa" else "Confirm Delete", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -1421,436 +866,186 @@ fun HomeScreen(
                     showResetConfirmDialog = false
                     resetCheckState = false
                 }) {
-                    Text(Strings.cancel(lang))
+                    Text(if (lang == AppLanguage.VI) "Hủy" else "Cancel", color = MazeTextBody)
                 }
             }
         )
     }
 
-    // Help Dialog
-    if (showHelpDialog) {
-        AlertDialog(
-            onDismissRequest = { showHelpDialog = false },
-            title = { Text(Strings.helpDialogTitle(lang), fontWeight = FontWeight.Bold, color = MazeTextH1) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(Strings.helpLine1(lang), fontWeight = FontWeight.Bold, color = MazeAmber)
-                    Text(Strings.helpLine2(lang))
-                    Text(Strings.helpLine3(lang))
-                    Text(Strings.helpLine4(lang))
-                    Text(Strings.helpLine5(lang))
-                    Text(Strings.helpLine6(lang))
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { showHelpDialog = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = MazeAmber, contentColor = Color(0xFF0F172A))
-                ) {
-                    Text(Strings.understood(lang))
-                }
-            }
-        )
-    }
-
-    // Level Action Dialog (Play Again or Replay)
-    val selectedDef = selectedLevelDefForDialog
-    if (selectedDef != null) {
-        val record = records[selectedDef.id]
-        val title = when {
-            selectedDef.tier == "DAILY" -> Strings.tabDaily(lang)
-            selectedDef.tier == "SUPER" -> "${Strings.superTierTitle(lang)} 1000×1000"
-            selectedDef.tier != null -> "${Strings.impossibleSectionTitle(lang)} (${selectedDef.tier})"
-            else -> "Level ${selectedDef.numericLevel ?: selectedDef.id}"
-        }
-
+    // Level Replay / Detail Modal
+    selectedLevelDefForDialog?.let { def ->
+        val record = records[def.id]
         AlertDialog(
             onDismissRequest = { selectedLevelDefForDialog = null },
+            containerColor = MazeSurface1,
+            shape = RoundedCornerShape(20.dp),
             title = {
                 Text(
-                    text = "🎮 $title (${selectedDef.w}×${selectedDef.h})",
+                    text = "${Strings.levelNum(lang, def.numericLevel ?: 1)} (${def.w}×${def.h})",
                     fontWeight = FontWeight.Bold,
-                    color = MazeTextH1,
-                    fontSize = 18.sp
+                    color = MazeTextH1
                 )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (record != null) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(Strings.bestRecord(lang), color = MazeTextBody, fontSize = 13.sp)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                for (i in 1..3) {
-                                    Icon(
-                                        imageVector = Icons.Default.Star,
-                                        contentDescription = null,
-                                        tint = if (i <= record.stars) MazeStar else Color(0x33FFFFFF),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(Strings.timeLabel(lang), color = MazeTextBody, fontSize = 13.sp)
-                            Text("${record.bestTimeSec}s", color = MazeAmber, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(Strings.movesLabel(lang), color = MazeTextBody, fontSize = 13.sp)
-                            Text("${record.bestMoves} (${Strings.targetLabel(lang, selectedDef.target)})", color = MazeTextH1, fontSize = 13.sp)
-                        }
-                    } else {
-                        Text(
-                            text = Strings.exactGoalLabel(lang, selectedDef.target),
-                            color = MazeTextBody,
-                            fontSize = 13.sp
-                        )
-                    }
+                Column {
+                    Text(
+                        text = if (record != null) {
+                            if (lang == AppLanguage.VI)
+                                "Kỷ lục: ${record.bestTimeSec}s • ${record.bestMoves} bước"
+                            else
+                                "Best: ${record.bestTimeSec}s • ${record.bestMoves} moves"
+                        } else {
+                            if (lang == AppLanguage.VI) "Bạn đã hoàn thành màn chơi này!" else "You have solved this puzzle!"
+                        },
+                        fontSize = 13.sp,
+                        color = MazeTextBody
+                    )
                 }
             },
             confirmButton = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                Button(
+                    onClick = {
+                        selectedLevelDefForDialog = null
+                        viewModel.startLevel(def)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MazeAmber, contentColor = Color(0xFF090B16)),
+                    shape = RoundedCornerShape(10.dp)
                 ) {
-                    Button(
-                        onClick = {
-                            val defToStart = selectedDef
-                            selectedLevelDefForDialog = null
-                            viewModel.startLevel(defToStart)
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MazeAmber, contentColor = Color(0xFF0F172A)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(Strings.playAgain(lang), fontWeight = FontWeight.Bold)
-                    }
-
-                    if (selectedDef.isReplaySupported && record?.pathHistoryJson?.isNotEmpty() == true) {
-                        OutlinedButton(
-                            onClick = {
-                                val defId = selectedDef.id
-                                selectedLevelDefForDialog = null
-                                viewModel.loadAndStartReplay(defId)
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(Strings.replayRouteBtn(lang), fontWeight = FontWeight.Bold, color = MazeTextH1)
-                        }
-                    }
-
-                    TextButton(
-                        onClick = { selectedLevelDefForDialog = null },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(Strings.close(lang), color = MazeTextMuted)
-                    }
+                    Text(if (lang == AppLanguage.VI) "Chơi lại" else "Replay", fontWeight = FontWeight.Bold)
                 }
             },
-            dismissButton = null
+            dismissButton = {
+                TextButton(onClick = { selectedLevelDefForDialog = null }) {
+                    Text(if (lang == AppLanguage.VI) "Đóng" else "Close", color = MazeTextBody)
+                }
+            }
+        )
+    }
+
+    // Sensitivity Dialog
+    if (showSensitivityDialog) {
+        MoveSensitivityDialog(
+            sensitivity = progress.moveSensitivity,
+            onSensitivityChange = { viewModel.setMoveSensitivity(it) },
+            onDismiss = { showSensitivityDialog = false },
+            lang = lang
+        )
+    }
+
+    // Cloud Sync Dialog
+    if (uiState.showCloudSyncDialog) {
+        CloudSyncDialog(
+            lastSyncTime = progress.lastCloudSyncTime,
+            totalStars = progress.totalStars,
+            highestCleared = progress.highestCleared,
+            language = lang,
+            onSyncConfirmed = { viewModel.confirmCloudSync() },
+            onDismiss = { viewModel.closeCloudSync() }
+        )
+    }
+
+    // Wolf Equipment Dialog
+    if (uiState.showWolfEquipmentDialog) {
+        WolfEquipmentDialog(
+            progress = progress,
+            language = lang,
+            onEquip = { viewModel.equipEquipment(it) },
+            onUnlock = { viewModel.buyEquipment(it) },
+            onBuyShield = { viewModel.buyShieldPack() },
+            onDismiss = { viewModel.closeWolfEquipmentDialog() }
         )
     }
 }
 
 @Composable
-private fun WolfChasePlayableCard(
-    progress: com.example.data.local.GameProgressEntity,
-    lang: AppLanguage,
-    nextWolfLevel: Int,
-    onPlayWolfLevel: (Int) -> Unit,
-    onOpenWolfEquipment: () -> Unit
+private fun SpecialModeItem(
+    title: String,
+    subtitle: String,
+    tag: String,
+    isUnlocked: Boolean,
+    accentColor: Color,
+    onClick: () -> Unit
 ) {
-    val activeGear = ShopCatalog.getEquipmentById(progress.equippedGearId)
-    val activeGearDurability = if (activeGear != null) progress.getGearDurability(activeGear.id) else 0
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MazeSurface1),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.2.dp, Color(0xFFF97316).copy(alpha = 0.75f), RoundedCornerShape(16.dp))
-            .testTag("wolf_chase_mode_card")
+    Surface(
+        onClick = onClick,
+        enabled = isUnlocked,
+        shape = RoundedCornerShape(14.dp),
+        color = if (isUnlocked) MazeSurface1 else MazeSurface2,
+        border = BorderStroke(1.dp, if (isUnlocked) MazeEdgeHighlight else Color.Transparent),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    Text(text = "🐺", fontSize = 20.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = if (lang == AppLanguage.VI) "THỬ THÁCH SÓI TRUY ĐUỔI" else "WOLF CHASE CHALLENGE",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFFFB923C)
-                        )
-                        Text(
-                            text = "5×5 → 30×30 • ${progress.wolfHighestCleared}/${MazeConfig.WOLF_MAX_LEVEL}",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MazeAmber
-                        )
-                        Text(
-                            text = if (lang == AppLanguage.VI) {
-                                "⚡ Sói đuổi sau 5 giây bắt đầu • Thời gian -30% • ❄️ >25 ô Ném Băng Xuyên Tường"
-                            } else {
-                                "⚡ Wolf chases after 5s • Time -30% • ❄️ >25 cells Wall-Piercing Ice"
-                            },
-                            fontSize = 10.sp,
-                            color = Color(0xFF38BDF8)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Button(
-                    onClick = { onPlayWolfLevel(nextWolfLevel) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFF97316),
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.height(36.dp).testTag("play_wolf_mode_btn")
-                ) {
-                    Text(
-                        text = if (lang == AppLanguage.VI) "Đua Màn #$nextWolfLevel" else "Play #$nextWolfLevel",
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isUnlocked) MazeTextH1 else MazeTextMuted
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    fontSize = 11.sp,
+                    color = MazeTextBody
+                )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Thanh mở giao diện Trang Bị Vật Phẩm Hỗ Trợ Màn Sói
             Surface(
-                onClick = onOpenWolfEquipment,
-                shape = RoundedCornerShape(10.dp),
-                color = MazeSurface2,
-                border = BorderStroke(1.dp, Color(0xFFF97316).copy(alpha = 0.55f)),
-                modifier = Modifier.fillMaxWidth()
+                shape = RoundedCornerShape(8.dp),
+                color = if (isUnlocked) accentColor.copy(alpha = 0.15f) else MazeSurface2,
+                border = BorderStroke(1.dp, if (isUnlocked) accentColor.copy(alpha = 0.5f) else MazeEdgeHighlight)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (activeGear != null && activeGearDurability > 0) {
-                                if (lang == AppLanguage.VI) "🎒 Đang dùng: ${activeGear.iconEmoji} ${activeGear.nameVi} ($activeGearDurability/${activeGear.maxDurability} ván)"
-                                else "🎒 Equipped: ${activeGear.iconEmoji} ${activeGear.nameEn} ($activeGearDurability/${activeGear.maxDurability} games)"
-                            } else {
-                                if (lang == AppLanguage.VI) "🎒 Chưa chọn trang bị hỗ trợ màn Sói (Độ bền 4–5 ván)"
-                                else "🎒 No Wolf Chase gear equipped (Durability 4–5 games)"
-                            },
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MazeTextH1
-                        )
-                        Text(
-                            text = if (lang == AppLanguage.VI) "Giày Thần Tốc (5 ván) • Khiên Aegis (4 ván) • La Bàn Tiên Tri (5 ván)"
-                            else "Haste Boots (5 games) • Aegis Shield (4 games) • Oracle Compass (5 games)",
-                            fontSize = 10.sp,
-                            color = Color(0xFFFB923C)
-                        )
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MazeAmber
-                    ) {
-                        Text(
-                            text = if (lang == AppLanguage.VI) "Trang Bị" else "Equip",
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF0F172A),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            val wolfLevels = remember { (1..MazeConfig.WOLF_MAX_LEVEL).toList() }
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                items(wolfLevels, key = { "wolf_$it" }) { wLvl ->
-                    val wDef = MazeConfig.wolfChaseDef(wLvl)
-                    val isCleared = wLvl <= progress.wolfHighestCleared
-                    val isUnlocked = wLvl <= progress.wolfHighestCleared + 1
-                    Surface(
-                        onClick = { onPlayWolfLevel(wLvl) },
-                        shape = RoundedCornerShape(12.dp),
-                        color = when {
-                            isCleared -> Color(0xFF064E3B).copy(alpha = 0.55f)
-                            isUnlocked -> MazeSurface2
-                            else -> Color(0xFF0F172A)
-                        },
-                        border = BorderStroke(
-                            1.dp,
-                            when {
-                                isCleared -> Color(0xFF10B981)
-                                isUnlocked -> Color(0xFFF97316)
-                                else -> MazeEdgeHighlight
-                            }
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = if (isCleared) "✓ #${wLvl}" else if (isUnlocked) "🐺 #${wLvl}" else "🔒 #${wLvl}",
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = if (isCleared) Color(0xFF34D399) else if (isUnlocked) MazeTextH1 else MazeTextMuted
-                            )
-                            Text(
-                                text = "${wDef.w}×${wDef.h}",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isUnlocked) Color(0xFFFB923C) else MazeTextMuted
-                            )
-                        }
-                    }
-                }
+                Text(
+                    text = tag,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isUnlocked) accentColor else MazeTextMuted,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ImpossibleModeCard(
-    progress: com.example.data.local.GameProgressEntity,
-    saveSlot: com.example.data.local.SaveSlotEntity?,
-    lang: AppLanguage,
-    isImpossibleUnlocked: Boolean,
-    onSelectClearedDef: (com.example.core.engine.LevelDef) -> Unit,
-    onStartDef: (com.example.core.engine.LevelDef) -> Unit,
-    onResume: () -> Unit
+private fun MoreShortcutButton(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MazeSurface1),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(
-                width = 1.dp,
-                color = if (isImpossibleUnlocked) MazeAmber.copy(alpha = 0.5f) else MazeEdgeHighlight,
-                shape = RoundedCornerShape(16.dp)
-            )
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = MazeSurface1,
+        border = BorderStroke(1.dp, MazeEdgeHighlight),
+        modifier = modifier.height(60.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.WorkspacePremium,
-                        contentDescription = Strings.impossibleSectionTitle(lang),
-                        tint = if (isImpossibleUnlocked) MazeAmber else MazeTextMuted,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = Strings.impossibleSectionTitle(lang),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isImpossibleUnlocked) MazeAmber else MazeTextH1
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = Strings.impossibleUnlockedDesc(lang),
-                style = MaterialTheme.typography.bodySmall,
-                color = MazeTextBody
+        Column(
+            modifier = Modifier.fillMaxSize().padding(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = MazeAmber,
+                modifier = Modifier.size(18.dp)
             )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            val impScroll = rememberScrollState()
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(impScroll),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                for (tier in 1..MazeConfig.IMPOSSIBLE_TIER_SIZES.size) {
-                    val def = MazeConfig.impossibleDefForTier(tier)
-                    val tierUnlocked = isImpossibleUnlocked && (tier <= progress.impossibleCleared + 1)
-                    val tierCleared = tier <= progress.impossibleCleared
-                    val isSaved = saveSlot?.defId == def.id
-
-                    TactileImpossibleTierButton(
-                        title = "${def.w}×${def.h}",
-                        subtitle = Strings.stepsUnit(lang, def.target),
-                        isUnlocked = tierUnlocked,
-                        isCleared = tierCleared,
-                        isSaved = isSaved,
-                        onClick = {
-                            if (isSaved) {
-                                onResume()
-                            } else if (tierCleared) {
-                                onSelectClearedDef(def)
-                            } else {
-                                onStartDef(def)
-                            }
-                        }
-                    )
-                }
-
-                val superDef = MazeConfig.superDef()
-                val superUnlocked = isImpossibleUnlocked && progress.impossibleCleared >= MazeConfig.IMPOSSIBLE_TIER_SIZES.size
-                val superCleared = progress.superCleared
-                val isSuperSaved = saveSlot?.defId == superDef.id
-
-                TactileImpossibleTierButton(
-                    title = Strings.superTierTitle(lang),
-                    subtitle = "1000×1000 · 10k",
-                    isUnlocked = superUnlocked,
-                    isCleared = superCleared,
-                    isSaved = isSuperSaved,
-                    isSuper = true,
-                    onClick = {
-                        if (isSuperSaved) {
-                            onResume()
-                        } else if (superCleared) {
-                            onSelectClearedDef(superDef)
-                        } else {
-                            onStartDef(superDef)
-                        }
-                    }
-                )
-            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MazeTextH1,
+                maxLines = 1
+            )
         }
     }
 }

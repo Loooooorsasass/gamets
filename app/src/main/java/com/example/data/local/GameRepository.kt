@@ -19,8 +19,8 @@ class GameRepository(private val db: AppDatabase) {
                     totalStars = 0,
                     coins = 100,
                     gems = 0,
-                    hintCount = 1, // Tặng 1 lượt gợi ý
-                    skipTokens = 1, // Tặng 1 lượt bỏ qua
+                    hintCount = 1, // Tặng 1 lượt gợi ý khởi đầu cho tài khoản mới
+                    skipTokens = 1, // Tặng 1 lượt bỏ qua khởi đầu cho tài khoản mới
                     keys = 0,
                     shieldCount = 0,
                     equippedGearId = "",
@@ -29,18 +29,6 @@ class GameRepository(private val db: AppDatabase) {
                     superCleared = false
                 )
             )
-        } else {
-            // Tặng 1 lượt gợi ý và 1 lượt bỏ qua cho người chơi
-            var updated = currentProgress
-            if (updated.hintCount < 1) {
-                updated = updated.copy(hintCount = 1)
-            }
-            if (updated.skipTokens < 1) {
-                updated = updated.copy(skipTokens = 1)
-            }
-            if (updated != currentProgress) {
-                db.gameProgressDao().insertOrUpdate(updated)
-            }
         }
 
         val currentAchievements = db.achievementDao().getAllAchievements().firstOrNull()
@@ -200,7 +188,9 @@ class GameRepository(private val db: AppDatabase) {
                 highestCleared = 0,
                 totalStars = 0,
                 coins = 100,
-                gems = 10,
+                gems = 0,
+                hintCount = 1,
+                skipTokens = 1,
                 impossibleCleared = 0,
                 superCleared = false
             )

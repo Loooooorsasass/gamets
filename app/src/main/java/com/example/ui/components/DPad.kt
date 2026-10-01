@@ -12,10 +12,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Gamepad
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ripple
@@ -24,23 +23,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.ui.theme.MazeAmber
+import com.example.ui.theme.MazeEdgeHighlight
 import com.example.ui.theme.MazeSurface1
 import com.example.ui.theme.MazeSurface2
 
 /**
- * Studio Pro Tactile D-Pad Controller:
- * - Thiết kế nút bấm nổi 3D với viền bắt sáng Specular Top Rim
- * - Hào quang Radial Spotlight đồng bộ với bảng 10 màu Bản Đồ Studio
- * - Tâm điều khiển (Studio Core Hub) ở chính giữa giúp định hướng trực quan
+ * Minimalist Studio Puzzle Controller:
+ * - 48x48dp interactive hitboxes conforming to Android standards
+ * - Dark muted background with clear white/accent arrows
+ * - Low visual noise so player's eyes stay on the maze
  */
 @Composable
 fun DPad(
@@ -49,9 +45,9 @@ fun DPad(
     enabled: Boolean = true,
     sensitivity: Float = 1.0f,
     accentColor: Color = MazeAmber,
-    wallColor: Color = Color(0xFF38BDF8)
+    wallColor: Color = Color(0xFFF05AAB)
 ) {
-    val buttonSize = 36.dp
+    val buttonSize = 48.dp
     val lastTapTimeRef = remember { java.util.concurrent.atomic.AtomicLong(0L) }
     val throttledMove: (Int, Int) -> Unit = { dx, dy ->
         val now = System.currentTimeMillis()
@@ -65,7 +61,7 @@ fun DPad(
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         // UP
         DPadButton(
@@ -74,62 +70,46 @@ fun DPad(
             onClick = { throttledMove(0, 1) },
             enabled = enabled,
             accentColor = accentColor,
-            wallColor = wallColor,
             modifier = Modifier.size(buttonSize).testTag("dpad_up")
         )
 
-        // LEFT, STUDIO CORE HUB, RIGHT
+        // LEFT, CENTER DOT, RIGHT
         Row(
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             DPadButton(
-                icon = Icons.Default.KeyboardArrowLeft,
+                icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                 contentDescription = "Move Left",
                 onClick = { throttledMove(-1, 0) },
                 enabled = enabled,
                 accentColor = accentColor,
-                wallColor = wallColor,
                 modifier = Modifier.size(buttonSize).testTag("dpad_left")
             )
 
-            // Central Studio Core Hub
+            // Minimalist Center Dot
             Box(
                 modifier = Modifier
-                    .size(20.dp)
+                    .size(buttonSize)
                     .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                accentColor.copy(alpha = 0.28f),
-                                MazeSurface1.copy(alpha = 0.9f)
-                            )
-                        )
-                    )
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.linearGradient(
-                            listOf(accentColor.copy(alpha = 0.65f), wallColor.copy(alpha = 0.25f))
-                        ),
-                        shape = CircleShape
-                    ),
+                    .background(MazeSurface1)
+                    .border(1.dp, MazeEdgeHighlight, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Gamepad,
-                    contentDescription = null,
-                    tint = accentColor.copy(alpha = 0.85f),
-                    modifier = Modifier.size(11.dp)
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = 0.6f))
                 )
             }
 
             DPadButton(
-                icon = Icons.Default.KeyboardArrowRight,
+                icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = "Move Right",
                 onClick = { throttledMove(1, 0) },
                 enabled = enabled,
                 accentColor = accentColor,
-                wallColor = wallColor,
                 modifier = Modifier.size(buttonSize).testTag("dpad_right")
             )
         }
@@ -141,7 +121,6 @@ fun DPad(
             onClick = { throttledMove(0, -1) },
             enabled = enabled,
             accentColor = accentColor,
-            wallColor = wallColor,
             modifier = Modifier.size(buttonSize).testTag("dpad_down")
         )
     }
@@ -154,7 +133,6 @@ private fun DPadButton(
     onClick: () -> Unit,
     enabled: Boolean,
     accentColor: Color,
-    wallColor: Color,
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -163,17 +141,10 @@ private fun DPadButton(
     Box(
         modifier = modifier
             .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        MazeSurface2,
-                        MazeSurface1
-                    )
-                )
-            )
+            .background(MazeSurface2)
             .border(
-                width = 1.5.dp,
-                color = if (enabled) accentColor.copy(alpha = 0.8f) else Color(0xFF334155),
+                width = 1.dp,
+                color = if (enabled) MazeEdgeHighlight else MazeSurface1,
                 shape = shape
             )
             .clickable(
@@ -187,7 +158,7 @@ private fun DPadButton(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (enabled) Color(0xFFF8FAFC) else Color(0xFF64748B),
+            tint = if (enabled) Color(0xFFF5F3FA) else Color(0xFF777185),
             modifier = Modifier.size(24.dp)
         )
     }

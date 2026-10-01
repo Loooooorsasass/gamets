@@ -473,7 +473,7 @@ fun OneLineScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     GlowingProgressBar(
-                        progress = (highestUnlockedIndex) / ONE_LINE_LEVELS.size.toFloat(),
+                        progress = ((highestUnlockedIndex + 1).toFloat() / ONE_LINE_LEVELS.size.toFloat()).coerceIn(0f, 1f),
                         activeColor = MazeAmber,
                         glowColor = MazeAmberGlow,
                         trackColor = MazeSurface2
@@ -810,12 +810,7 @@ fun OneLineScreen(
                                 currentSteps = totalSteps
                                 remainingCells = 0
                                 showWinDialog = true
-                                viewModel.addCoins(30)
-                                viewModel.onOneLineGameCleared(activity)
-
-                                if (selectedLevelIndex + 1 > highestUnlockedIndex && selectedLevelIndex + 1 < ONE_LINE_LEVELS.size) {
-                                    viewModel.updateOneLineProgress(selectedLevelIndex + 1)
-                                }
+                                viewModel.completeOneLineLevel(selectedLevelIndex, activity)
                             }
 
                             override fun onUndo(removedPoint: OneLineGameView.Point?) {}

@@ -57,7 +57,7 @@ fun MazeCanvas(
             factory = { ctx ->
                 MazeGameView(ctx).apply {
                     setOnMazeMoveListener(object : MazeGameView.OnMazeMoveListener {
-                        override fun onMove(dx: Int, dy: Int, newPlayer: MazeGameView.MazePoint, totalMoves: Int) {
+                        override fun onMove(dx: Int, dy: Int, newPlayer: MazeGameView.MazePoint?, totalMoves: Int) {
                             onMove(dx, dy)
                         }
 

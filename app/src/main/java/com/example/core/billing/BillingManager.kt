@@ -13,6 +13,7 @@ import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
+import com.example.BuildConfig
 import com.example.core.ads.AdConstants
 import com.example.core.time.NetworkTimeManager
 
@@ -210,11 +211,14 @@ class BillingManager(
     ) {
         val productId = getProductIdForTier(tier)
 
-        // Trường hợp người dùng chưa điền Product ID hoặc dịch vụ Billing chưa sẵn sàng trên máy dev:
-        // Cung cấp luồng mô phỏng hoàn tất để kiểm thử tính năng ngay lập tức
+        // Cung cấp luồng mô phỏng CHỈ trong môi trường DEBUG khi chưa cấu hình Product ID trên Play Console
         if (productId.isEmpty() || !isConnected) {
-            Log.i(TAG, "Product ID cho VIP $tier đang để trống. Chạy luồng kích hoạt mô phỏng mượt mà.")
-            onFallbackSuccess()
+            if (BuildConfig.DEBUG) {
+                Log.i(TAG, "[DEBUG] Product ID cho VIP $tier đang để trống. Kích hoạt mô phỏng trong môi trường thử nghiệm.")
+                onFallbackSuccess()
+            } else {
+                Log.w(TAG, "Dịch vụ thanh toán Google Play chưa sẵn sàng hoặc Product ID chưa được cấu hình.")
+            }
             return
         }
 
@@ -232,13 +236,16 @@ class BillingManager(
 
             val responseCode = billingClient?.launchBillingFlow(activity, billingFlowParams)?.responseCode
             if (responseCode != BillingClient.BillingResponseCode.OK) {
-                Log.w(TAG, "Không thể mở luồng thanh toán: $responseCode")
-                onFallbackSuccess()
+                Log.w(TAG, "Không thể mở luồng thanh toán Google Play: mã lỗi $responseCode")
+                if (BuildConfig.DEBUG) {
+                    onFallbackSuccess()
+                }
             }
         } else {
-            // Không tìm thấy SKU trên Play Store (chưa tạo trên Console), chạy fallback để trải nghiệm
-            Log.i(TAG, "Chưa tìm thấy SKU $productId trên Google Play. Chạy fallback mô phỏng.")
-            onFallbackSuccess()
+            Log.w(TAG, "Chưa tìm thấy SKU $productId trên Google Play.")
+            if (BuildConfig.DEBUG) {
+                onFallbackSuccess()
+            }
         }
     }
 
@@ -280,7 +287,9 @@ class BillingManager(
                     products.contains(AdConstants.PRODUCT_ID_VIP_3_DISCOUNT) -> onPurchaseSuccess(3)
             products.contains(AdConstants.PRODUCT_ID_VIP_2) ||
                     products.contains(AdConstants.PRODUCT_ID_VIP_2_DISCOUNT) -> onPurchaseSuccess(2)
-            else -> onPurchaseSuccess(2)
+            else -> {
+                Log.w(TAG, "Giao dịch chứa sản phẩm không xác định: $products. Không cấp quyền lợi VIP tự động.")
+            }
         }
     }
 

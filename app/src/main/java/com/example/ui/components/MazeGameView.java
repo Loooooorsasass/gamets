@@ -688,105 +688,41 @@ public class MazeGameView extends View {
         if (initialDx == 0 && initialDy == 0) return false;
         int dx = Integer.compare(initialDx, 0);
         int dy = Integer.compare(initialDy, 0);
-        if (dx != 0 && dy != 0) dy = 0;
-
-        List<MazePoint> slideSteps = new ArrayList<>();
-        int simX = playerPos.x;
-        int simY = playerPos.y;
-
-        while (true) {
-            int nextX = simX + dx;
-            int nextY = simY + dy;
-            if (!isInsideMaze(nextX, nextY)) break;
-
-            int dirMask = 0;
-            if (dx == 1 && dy == 0) dirMask = EAST;
-            else if (dx == -1 && dy == 0) dirMask = WEST;
-            else if (dx == 0 && dy == 1) dirMask = NORTH;
-            else if (dx == 0 && dy == -1) dirMask = SOUTH;
-
-            int currentMask = cellAt(simX, simY);
-            if ((currentMask & dirMask) == 0) {
-                break;
-            }
-
-            slideSteps.add(new MazePoint(nextX, nextY));
-            simX = nextX;
-            simY = nextY;
-
-            // Kiểm tra điều kiện dừng tại ô tiếp theo (tường phía trước hoặc ngã rẽ)
-            int newMask = cellAt(simX, simY);
-            boolean wallAhead = (newMask & dirMask) == 0;
-            if (wallAhead) break;
-
-            boolean atIntersection = false;
-            if (dx != 0) {
-                if ((newMask & NORTH) != 0 || (newMask & SOUTH) != 0) {
-                    atIntersection = true;
-                }
-            } else if (dy != 0) {
-                if ((newMask & WEST) != 0 || (newMask & EAST) != 0) {
-                    atIntersection = true;
-                }
-            }
-
-            if (atIntersection) {
-                break;
+        if (dx != 0 && dy != 0) {
+            if (Math.abs(initialDx) >= Math.abs(initialDy)) {
+                dy = 0;
+            } else {
+                dx = 0;
             }
         }
 
-        if (!slideSteps.isEmpty()) {
-            removeCallbacks(stepQueueRunnable);
-            pendingStepsQueue.clear();
-            pendingStepsQueue.addAll(slideSteps);
-            processNextPendingStep();
+        if (moveListener != null) {
+            moveListener.onMove(dx, dy, playerPos, 0);
             return true;
         }
         return false;
     }
 
     /**
-     * Di chuyển nhân vật ở chế độ từng bước đến ô (targetX, targetY):
-     * - Tốc độ tối đa đúng 0.1 giây / bước (100ms / ô): đi 20 ô mất đúng 2 giây.
-     * - Áp dụng đều cho cả TIẾN (đi tiếp các ô mới) và LÙI (hoàn tác theo lịch sử).
+     * Di chuyển nhân vật về hướng ô (targetX, targetY) thông qua GameViewModel authority:
      */
     private boolean tryMoveToTappedCell(int targetX, int targetY) {
         if (!isInsideMaze(targetX, targetY)) return false;
         if (targetX == playerPos.x && targetY == playerPos.y) return false;
 
-        // 1. Kiểm tra lùi về ô trước đó trên đường đã đi (Lùi / Undo)
-        int existingHistoryIdx = -1;
-        for (int i = 0; i < pathHistory.size() - 1; i++) {
-            MazePoint p = pathHistory.get(i);
-            if (p.x == targetX && p.y == targetY) {
-                existingHistoryIdx = i;
-                break;
-            }
-        }
-
-        if (existingHistoryIdx >= 0) {
-            removeCallbacks(stepQueueRunnable);
-            pendingStepsQueue.clear();
-            for (int i = pathHistory.size() - 2; i >= existingHistoryIdx; i--) {
-                MazePoint p = pathHistory.get(i);
-                pendingStepsQueue.add(new MazePoint(p.x, p.y));
-            }
-            processNextPendingStep();
-            return true;
-        }
-
-        // 2. Tìm đường đi tới ô mục tiêu mới (Tiến / Forward)
-        List<MazePoint> path = findMultiTurnMazePath(targetX, targetY, MAX_MAZE_TURN_CORNERS);
-        if (path != null && !path.isEmpty()) {
-            removeCallbacks(stepQueueRunnable);
-            pendingStepsQueue.clear();
-            pendingStepsQueue.addAll(path);
-            processNextPendingStep();
-            return true;
+        int dx = targetX - playerPos.x;
+        int dy = targetY - playerPos.y;
+        if (Math.abs(dx) >= Math.abs(dy)) {
+            dx = (dx > 0) ? 1 : -1;
+            dy = 0;
+        } else {
+            dy = (dy > 0) ? 1 : -1;
+            dx = 0;
         }
 
         if (moveListener != null) {
-            moveListener.onWallHit();
+            moveListener.onMove(dx, dy, playerPos, 0);
+            return true;
         }
         return false;
     }

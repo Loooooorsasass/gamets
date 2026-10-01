@@ -2,55 +2,57 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Art Director Design Tokens ("Pro Studio Cyber-Arcade High-Contrast System")
-// 1. Background: Deep Rich Midnight Navy (#080D1A)
-val MazeBgDark = Color(0xFF080D1A)
+// Premium Dark-First Puzzle Studio Palette
+// 1. Background: Quiet Dark Navy/Violet (#090B16)
+val MazeBgDark = Color(0xFF090B16)
 
-// 2. Surface 1: Studio Card & Panel Base Surface (#111C35)
-val MazeSurface1 = Color(0xFF111C35)
+// 2. Surface 1: Studio Card & Panel Base Surface (#131020)
+val MazeSurface1 = Color(0xFF131020)
 
-// 3. Surface 2: Elevated Card & Interactive Surface (#182849)
-val MazeSurface2 = Color(0xFF182849)
+// 3. Surface 2: Elevated Surface (#1B1630)
+val MazeSurface2 = Color(0xFF1B1630)
 
-// Surface 3: High-Emphasis Container Surface (#223561)
-val MazeSurface3 = Color(0xFF223561)
+// Surface 3: High-Emphasis Container Surface (#241E3E)
+val MazeSurface3 = Color(0xFF241E3E)
 
-// 4. Primary Accent: Radiant Warm Amber Gold & Cyber Cyan
-val MazeAmber = Color(0xFFFFB020)
-val MazeAmberGlow = Color(0xFFFFC53D)
+// 4. Primary Accent: Warm Gold (#F4C15D) & Clean Accents
+val MazeAmber = Color(0xFFF4C15D)
+val MazeAmberGlow = Color(0xFFFFD580)
 val MazeAccent = MazeAmber
-val MazeAccentMint = Color(0xFF10B981)
-val MazeCyan = Color(0xFF00E5FF)
-val MazeCyanGlow = Color(0xFF38BDF8)
-val MazeViolet = Color(0xFF8B5CF6)
-val MazePink = Color(0xFFEC4899)
+val MazeAccentMint = Color(0xFF48D597)
+val MazeCyan = Color(0xFF38BDF8)
+val MazeCyanGlow = Color(0xFF7DD3FC)
+val MazeViolet = Color(0xFFA855F7)
+val MazePink = Color(0xFFF05AAB)
 
-// 5. Studio Lighting Borders & Specular Edge Highlights
-val MazeEdgeHighlight = Color(0xFF293B66) // Crisp modern studio edge
-val MazeEdgeHighlightBright = Color(0xFF435C9A) // Strong specular rim highlight
+// 5. Studio Lighting Borders & Specular Edge Highlights (#302945)
+val MazeEdgeHighlight = Color(0xFF302945)
+val MazeEdgeHighlightBright = Color(0xFF463C65)
 
 // 6. Tactile Button Shadows & Highlights
-val MazeTactileTopHighlight = Color(0x33FFFFFF) // Crisp top inner bevel light
-val MazeTactileShadow = Color(0x80020617)
+val MazeTactileTopHighlight = Color(0x22FFFFFF)
+val MazeTactileShadow = Color(0x66000000)
 
-// Text Tokens (High-contrast studio legibility for pro players)
-val MazeTextH1 = Color(0xFFF8FAFC)
-val MazeTextBody = Color(0xFFCBD5E1)
-val MazeTextMuted = Color(0xFF8A9BB8)
+// Text Tokens (High-contrast, clean typography)
+val MazeTextH1 = Color(0xFFF5F3FA)
+val MazeTextBody = Color(0xFFA8A2B8)
+val MazeTextMuted = Color(0xFF777185)
 
 // Semantic Tokens
-val MazeStar = Color(0xFFFFB800)
-val MazeCoin = Color(0xFFFFC000)
-val MazeDanger = Color(0xFFFF4D4D)
-val MazeSuccess = Color(0xFF10B981)
-val MazePlayer = Color(0xFF00E5FF)
-val MazeWallDark = Color(0xFF38BDF8)
+val MazeStar = Color(0xFFF4C15D)
+val MazeCoin = Color(0xFFF4C15D)
+val MazeDanger = Color(0xFFFF5F67)
+val MazeSuccess = Color(0xFF48D597)
+val MazePlayer = Color(0xFFF4C15D)
+val MazeGoal = Color(0xFFFF5B68)
+val MazeWallDark = Color(0xFFF05AAB)
+val MazeFloor = Color(0xFF110B1C)
 
 // Consistent Studio Tokens
-val MazeBgLight = Color(0xFF080D1A)
-val MazeSurfaceLight = Color(0xFF111C35)
-val MazeSurface2Light = Color(0xFF182849)
-val MazeTextLight = Color(0xFFF8FAFC)
+val MazeBgLight = Color(0xFF090B16)
+val MazeSurfaceLight = Color(0xFF131020)
+val MazeSurface2Light = Color(0xFF1B1630)
+val MazeTextLight = Color(0xFFF5F3FA)
 
 /**
  * Bảng 10 màu Bản Đồ Studio chuyên nghiệp (10-Color Studio Map Palette)
